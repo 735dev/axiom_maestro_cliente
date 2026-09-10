@@ -105,8 +105,8 @@ const Usuarios = () => {
                   <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
                     <button className="btn sm" onClick={() => setDetalle(u)}>Permisos</button>
                     {u.estado === 'BLOQUEADO'
-                      ? <button className="btn sm" onClick={() => dispatch(cambiarEstadoUsuario({ id: u.id, estado: 'ACTIVO' }))}>Reactivar</button>
-                      : <button className="btn sm" onClick={() => dispatch(cambiarEstadoUsuario({ id: u.id, estado: 'BLOQUEADO' }))}>Bloquear</button>}
+                      ? <button className="btn sm" onClick={() => maestroApi.cambiarEstadoUsuario(u.id, 'active').then(() => dispatch(cambiarEstadoUsuario({ id: u.id, estado: 'ACTIVO' }))) }>Reactivar</button>
+                      : <button className="btn sm" onClick={() => maestroApi.cambiarEstadoUsuario(u.id, 'blocked').then(() => dispatch(cambiarEstadoUsuario({ id: u.id, estado: 'BLOQUEADO' }))) }>Bloquear</button>}
                   </div>
                 </td>
               </tr>
@@ -168,6 +168,18 @@ const PermisosUsuario: React.FC<{ usuario: UsuarioSistema; onClose: () => void }
   const dispatch = useAppDispatch()
   const rol = roles.find(r => r.id === u.rolId)!
 
+  const actualizarExcepcion = async (p: PermissionCode, modo: 'conceder' | 'heredar' | 'revocar') => {
+    if (modo === 'heredar') return
+    const motivo = window.prompt(`Justificación para ${modo === 'conceder' ? 'conceder' : 'revocar'} ${p}:`)
+    if (!motivo || motivo.trim().length < 10) return
+    try {
+      const permiso = (await maestroApi.permisos()).find(x => x.codigo === p)
+      if (!permiso) return
+      await maestroApi.excepcionUsuario(u.id, permiso.id, modo === 'conceder', motivo)
+      dispatch(alternarExcepcion({ id: u.id, permiso: p, modo }))
+    } catch { window.alert('No fue posible guardar la excepción de permiso.') }
+  }
+
   const modoDe = (p: PermissionCode) =>
     u.concedidos.includes(p) ? 'conceder' : u.revocados.includes(p) ? 'revocar' : 'heredar'
 
@@ -198,7 +210,7 @@ const PermisosUsuario: React.FC<{ usuario: UsuarioSistema; onClose: () => void }
                   </span>
                   {(['conceder', 'heredar', 'revocar'] as const).map(m => (
                     <button key={m} className="btn sm"
-                      onClick={() => dispatch(alternarExcepcion({ id: u.id, permiso: p, modo: m }))}
+                      onClick={() => actualizarExcepcion(p, m)}
                       style={modo === m
                         ? { background: m === 'conceder' ? 'var(--ok)' : m === 'revocar' ? 'var(--bad)' : 'var(--surface)', color: m === 'heredar' ? 'var(--fg)' : '#fff', borderColor: 'transparent' }
                         : undefined}>
@@ -232,6 +244,8 @@ const Roles = () => {
   const [borrando, setBorrando] = useState(false)
   /** Nombre del rol recién creado: se selecciona solo cuando aparece en el store. */
   const [pendiente, setPendiente] = useState<string | null>(null)
+  const [guardando, setGuardando] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     if (!pendiente) return
@@ -244,6 +258,17 @@ const Roles = () => {
   const listados = roles.filter(r => r.nombre.toLowerCase().includes(qRol.trim().toLowerCase()))
   const rolesPag = usePaginacion(listados)
   const usuariosDelRol = usuarios.filter(u => u.rolId === rol.id)
+
+  const guardarPermisos = async (siguientes: PermissionCode[]) => {
+    setGuardando(true); setError(null)
+    try {
+      const permisos = await maestroApi.permisos()
+      const ids = siguientes.map(c => permisos.find(p => p.codigo === c)?.id).filter((id): id is string => Boolean(id))
+      await maestroApi.reemplazarPermisosRol(rol.id, ids)
+      dispatch(sincronizarAdministracion({ usuarios, roles: roles.map(r => r.id === rol.id ? { ...r, permisos: siguientes } : r) }))
+    } catch { setError('No se pudieron actualizar los permisos del rol.') }
+    finally { setGuardando(false) }
+  }
 
 
   return (
@@ -291,10 +316,12 @@ const Roles = () => {
 
           <EditorPermisos
             permisos={rol.permisos}
-            onAlternar={p => dispatch(alternarPermisoRol({ rolId: rol.id, permiso: p }))}
-            onGrupo={(permisos, valor) => dispatch(fijarPermisosRol({ rolId: rol.id, permisos, valor }))}
+            onAlternar={p => guardarPermisos(rol.permisos.includes(p) ? rol.permisos.filter(x => x !== p) : [...rol.permisos, p])}
+            onGrupo={(permisos, valor) => guardarPermisos(valor ? Array.from(new Set([...rol.permisos, ...permisos])) : rol.permisos.filter(p => !permisos.includes(p)))}
             pie={<><b className="num">{conRol(rol.id)}</b> usuario{conRol(rol.id) === 1 ? '' : 's'} con este rol</>}
           />
+          {guardando && <p className="td-sub">Guardando permisos…</p>}
+          {error && <p className="val-err">{error}</p>}
         </div>
       </div>
 

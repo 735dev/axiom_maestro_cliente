@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { Pill, Modal, Field } from '@/shared/ui'
 import { useAppDispatch, useAppSelector } from '@/shared/store/hooks'
 import { publicarFormulario, versionVigente } from '../store/empresasSlice'
@@ -12,6 +12,14 @@ import { RenderCampo, campoVisible } from '../formulario/RenderCampo'
 import { comparar, resumen, type Cambio } from '../formulario/comparar'
 import { selectCatalogosDe } from '@/features/catalogos/store/catalogosSlice'
 import { columnasSeccion } from '@/shared/utils/anchoGrid'
+import { maestroApi } from '@/shared/api/maestro'
+
+const tipoDesdeApi = (tipo: string): TipoCampo => ({
+  si_no: 'si-no', seleccion_multiple: 'multiple', correo: 'email', documento_identidad: 'documento',
+}[tipo] as TipoCampo ?? tipo as TipoCampo)
+const tipoApi = (tipo: TipoCampo) => ({
+  'si-no': 'si_no', multiple: 'seleccion_multiple', email: 'correo', documento: 'documento_identidad', url: 'texto',
+} as Partial<Record<TipoCampo, string>>)[tipo] ?? tipo
 
 /**
  * Editor del formulario de una empresa.
@@ -56,6 +64,22 @@ export const EditorFormulario = () => {
   const [motivo, setMotivo] = useState('')
   /** Valores de juguete para que la vista previa reaccione como la real. */
   const [demo, setDemo] = useState<Record<string, unknown>>({})
+  const [apiError, setApiError] = useState<string | null>(null)
+
+  useEffect(() => {
+    let activo = true
+    maestroApi.formularioVigente().then(f => {
+      if (!activo) return
+      const seccionesApi = f.secciones.sort((a, b) => a.orden - b.orden).map(s => ({ id: s.id, nombre: s.nombre, sub: '' }))
+      const camposApi = f.secciones.flatMap(s => s.campos.sort((a, b) => a.orden - b.orden).map(c => ({
+        id: c.id, seccion: s.id, etiqueta: c.etiqueta, tipo: tipoDesdeApi(c.tipo_campo), obligatorio: c.obligatorio,
+        estandar: c.es_estandar ? c.codigo : undefined, catalogo: c.catalogo_ref ?? undefined,
+        ancho: c.ancho as AnchoCampo,
+      }))) as Campo[]
+      setSecciones(seccionesApi); setCampos(camposApi); setSeccion(seccionesApi[0]?.id ?? '')
+    }).catch(() => { if (activo) setApiError('No fue posible cargar el formulario vigente desde el servidor.') })
+    return () => { activo = false }
+  }, [])
 
   const cambiarEmpresa = (id: string) => {
     const v = versionVigente(empresas.find(e => e.id === id)!)
@@ -116,6 +140,7 @@ export const EditorFormulario = () => {
   return (
     <>
       <div className="ef-top">
+        {apiError && <div className="val-err">{apiError}</div>}
         <div className="ef-emp">
           <label>Empresa</label>
           <select value={empresa.id} onChange={e => cambiarEmpresa(e.target.value)}>
@@ -334,8 +359,11 @@ export const EditorFormulario = () => {
           footer={<><button className="btn" onClick={() => setPublicando(false)}>Cancelar</button>
             <button className="btn pri" disabled={motivo.trim().length < 10}
               onClick={() => {
-                dispatch(publicarFormulario({ id: empresa.id, secciones, campos, motivo, usuario: usuario!.nombre }))
-                setPublicando(false)
+                const payload = { motivo, secciones: secciones.map((s, i) => ({ nombre: s.nombre, orden: i + 1, campos: campos.filter(c => c.seccion === s.id).map((c, j) => ({ codigo: c.estandar ?? c.id, etiqueta: c.etiqueta, tipo_campo: tipoApi(c.tipo), orden: j + 1, obligatorio: c.obligatorio, es_estandar: Boolean(c.estandar), catalogo_ref: c.catalogo, ancho: c.ancho ?? 'auto' })) })) }
+                maestroApi.publicarFormulario(payload).then(() => {
+                  dispatch(publicarFormulario({ id: empresa.id, secciones, campos, motivo, usuario: usuario!.nombre }))
+                  setPublicando(false)
+                }).catch(() => setApiError('No fue posible publicar el formulario en el servidor.'))
               }}>Publicar</button></>}>
           <p className="dlg-txt">
             La v{vigente.version} no se modifica: queda como está y esta se agrega encima. Los

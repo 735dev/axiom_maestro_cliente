@@ -29,4 +29,5 @@ export const maestroApi = {
   excepcionUsuario: (id: string, permiso_id: string, concedido: boolean, motivo: string) =>
     httpClient.post(`/administracion/usuarios/${id}/permisos`, { permiso_id, concedido, motivo }),
   formularioVigente: () => httpClient.get<ApiEnvelope<ApiFormulario>>('/formulario/').then(r => r.data.data),
+  publicarFormulario: (payload: unknown) => httpClient.post('/formulario/versiones', payload).then(r => r.data),
 }
