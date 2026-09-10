@@ -107,6 +107,10 @@ const slice = createSlice({
     crearUsuario(s, a: PayloadAction<Omit<UsuarioSistema, 'id'>>) {
       s.usuarios.unshift({ ...a.payload, id: 'u' + Date.now() })
     },
+    sincronizarAdministracion(s, a: PayloadAction<{ usuarios: UsuarioSistema[]; roles: Rol[] }>) {
+      s.usuarios = a.payload.usuarios
+      s.roles = a.payload.roles
+    },
     editarUsuario(s, a: PayloadAction<{ id: string; cambios: Partial<UsuarioSistema> }>) {
       const u = s.usuarios.find(x => x.id === a.payload.id)
       if (u) Object.assign(u, a.payload.cambios)
@@ -215,6 +219,7 @@ const slice = createSlice({
 
 export const {
   crearUsuario, editarUsuario, cambiarEstadoUsuario,
+  sincronizarAdministracion,
   alternarExcepcion, alternarPermisoRol, crearRol,
   editarRol, borrarRol, fijarPermisosRol,
 } = slice.actions

@@ -3,6 +3,7 @@ import { Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { useAppDispatch, useAppSelector } from '@/shared/store/hooks'
 import { login } from '@/shared/store/slices/authSlice'
 import { permisosEfectivos } from '@/features/usuarios/store/usuariosSlice'
+import { maestroApi } from '@/shared/api/maestro'
 
 /**
  * Acceso único del sistema.
@@ -51,7 +52,22 @@ export const LoginPage = () => {
   // Con sesión abierta esta pantalla no tiene sentido.
   if (token) return <Navigate to={destinoDe(ambitoActual ?? 'empresa')} replace />
 
-  const entrar = () => {
+  const entrar = async () => {
+    if (!correo.trim() || !clave.trim()) return setError('Correo o contraseña incorrectos.')
+    try {
+      const tokenApi = await maestroApi.login(correo, clave)
+      // El token se instala de forma temporal para que /auth/me viaje con él.
+      dispatch(login({ token: tokenApi.access_token, usuario: { id: '', nombre: '', rol: '', permisos: [], ambito: 'empresa', empresaId: null } }))
+      const sesion = await maestroApi.sesion()
+      const ambito = sesion.scope === 'platform' ? 'plataforma' : 'empresa'
+      dispatch(login({ token: tokenApi.access_token, usuario: { id: sesion.user_id, nombre: sesion.nombre, rol: sesion.rol, permisos: sesion.permisos, ambito, empresaId: sesion.empresa_id } }))
+      navigate(destinoDe(ambito), { replace: true })
+    } catch {
+      dispatch({ type: 'auth/logout' })
+      setError('Correo o contraseña incorrectos.')
+    }
+  }
+  /*const entrarMock = () => {
     const u = usuarios.find(x => x.correo.toLowerCase() === correo.trim().toLowerCase())
     // Mismo mensaje si el correo no existe o la clave está mal: decir cuál de
     // los dos falló convierte el formulario en un verificador de correos.
@@ -69,7 +85,7 @@ export const LoginPage = () => {
       },
     }))
     navigate(destinoDe(esDeAxiom(u.empresaId) ? 'plataforma' : 'empresa'), { replace: true })
-  }
+  }*/
 
   const donde = (empresaId: string | null) =>
     empresaId ? empresas.find(e => e.id === empresaId)?.nombre ?? empresaId : 'Axiom Core Tech'

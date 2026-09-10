@@ -9,11 +9,12 @@ import { useAppDispatch, useAppSelector } from '@/shared/store/hooks'
 import {
   crearUsuario, editarUsuario, cambiarEstadoUsuario, alternarExcepcion,
   alternarPermisoRol, crearRol, editarRol, borrarRol, fijarPermisosRol, permisosEfectivos,
-  selectUsuariosDeMiEmpresa, selectRolesDeMiEmpresa,
+  selectUsuariosDeMiEmpresa, selectRolesDeMiEmpresa, sincronizarAdministracion,
   type UsuarioSistema, type EstadoUsuario, type Rol,
 } from '../store/usuariosSlice'
 import * as V from '@/features/clientes/schemas/cliente.schema'
 import { EditorPermisos } from '../components/EditorPermisos'
+import { maestroApi, type ApiRol, type ApiUsuario } from '@/shared/api/maestro'
 
 const TODOS = CATALOGO.map(p => p.codigo)
 
@@ -24,11 +25,21 @@ const EstadoPill: React.FC<{ e: EstadoUsuario }> = ({ e }) => {
 
 export const UsuariosPage = () => {
   const [tab, setTab] = useState('Usuarios')
+  const dispatch = useAppDispatch()
+  const [errorApi, setErrorApi] = useState<string | null>(null)
+  useEffect(() => {
+    let activo = true
+    Promise.all([maestroApi.usuarios(), maestroApi.roles()])
+      .then(([usuarios, roles]) => { if (activo) dispatch(sincronizarAdministracion({ usuarios: usuarios.map(usuarioDesdeApi), roles: roles.map(rolDesdeApi) })) })
+      .catch(() => { if (activo) setErrorApi('No fue posible cargar la administración desde el servidor.') })
+    return () => { activo = false }
+  }, [dispatch])
   return (
     <>
       <Card flush>
         <Tabs items={['Usuarios', 'Roles y permisos', 'Catálogo de permisos']} value={tab} onChange={setTab} />
         <div style={{ padding: 18 }}>
+          {errorApi && <div className="val-err">{errorApi}</div>}
           {tab === 'Usuarios' && <Usuarios />}
           {tab === 'Roles y permisos' && <Roles />}
           {tab === 'Catálogo de permisos' && <Catalogo />}
@@ -37,6 +48,9 @@ export const UsuariosPage = () => {
     </>
   )
 }
+
+const rolDesdeApi = (r: ApiRol): Rol => ({ id: r.id, nombre: r.nombre, descripcion: r.descripcion ?? '', permisos: r.permisos.map(p => p.codigo as PermissionCode), sistema: r.es_predefinido, empresaId: r.empresa_id ?? undefined, plataforma: !r.empresa_id })
+const usuarioDesdeApi = (u: ApiUsuario): UsuarioSistema => ({ empresaId: u.empresa_id ?? null, id: u.id, nombre: u.nombre_completo, correo: u.email, rolId: u.rol_id ?? '', estado: ({ active: 'ACTIVO', blocked: 'BLOQUEADO', invited: 'INVITADO', inactive: 'INACTIVO' }[u.status] ?? 'INACTIVO') as EstadoUsuario, concedidos: [], revocados: [] })
 
 /* ---------------- Usuarios ---------------- */
 const Usuarios = () => {

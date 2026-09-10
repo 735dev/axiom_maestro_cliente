@@ -27,6 +27,9 @@ const slice = createSlice({
       s.bitacora.unshift(sellar(a.payload.usuario, a.payload.rol, 'Alta de cliente',
         `${a.payload.cliente.razonSocial} — código ${codigo} asignado`))
     },
+    reemplazarClientesDesdeApi(s, a: PayloadAction<Cliente[]>) {
+      s.lista = a.payload
+    },
     /**
      * El portal guarda al cerrar cada bloque. Si ya existe el código, actualiza
      * únicamente ese borrador; si no, asigna el código único en este primer
@@ -83,7 +86,7 @@ const slice = createSlice({
   },
 })
 
-export const { crearCliente, guardarBorradorPortal, editarCliente, agregarPersona, quitarPersona, cambiarEstadoRegistro } = slice.actions
+export const { crearCliente, guardarBorradorPortal, reemplazarClientesDesdeApi, editarCliente, agregarPersona, quitarPersona, cambiarEstadoRegistro } = slice.actions
 export default slice.reducer
 
 /**
