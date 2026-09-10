@@ -6,6 +6,7 @@ import {
   type UsuarioSistema,
 } from '@/features/usuarios/store/usuariosSlice'
 import { PERMISSIONS, type PermissionCode } from '@/shared/auth/permissions'
+import { maestroApi } from '@/shared/api/maestro'
 
 const TODOS = Object.values(PERMISSIONS) as PermissionCode[]
 
@@ -108,10 +109,10 @@ export const UsuariosPlataforma = () => {
           onClose={() => setConfirmar(null)}
           footer={<><button className="btn" onClick={() => setConfirmar(null)}>Cancelar</button>
             <button className="btn pri" onClick={() => {
-              dispatch(cambiarEstadoUsuario({
-                id: confirmar.id, estado: confirmar.estado === 'BLOQUEADO' ? 'ACTIVO' : 'BLOQUEADO',
-              }))
-              setConfirmar(null)
+              const siguiente = confirmar.estado === 'BLOQUEADO' ? 'ACTIVO' : 'BLOQUEADO'
+              maestroApi.cambiarEstadoUsuario(confirmar.id, siguiente === 'ACTIVO' ? 'active' : 'blocked')
+                .then(() => dispatch(cambiarEstadoUsuario({ id: confirmar.id, estado: siguiente })))
+                .finally(() => setConfirmar(null))
             }}>{confirmar.estado === 'BLOQUEADO' ? 'Reactivar' : 'Bloquear'}</button></>}>
           <p className="dlg-txt">
             <b>{confirmar.nombre}</b> — {rolDe(confirmar.rolId)} en {donde(confirmar)}.
