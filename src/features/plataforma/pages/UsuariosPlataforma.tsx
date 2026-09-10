@@ -36,6 +36,17 @@ export const UsuariosPlataforma = () => {
     u.empresaId ? empresas.find(e => e.id === u.empresaId)?.nombre ?? u.empresaId : AXIOM
   const rolDe = (id: string) => roles.find(r => r.id === id)?.nombre ?? '—'
   const esDeAxiom = (u: UsuarioSistema) => u.empresaId === null
+  const excepcion = async (u: UsuarioSistema, concedido: boolean) => {
+    const codigo = window.prompt(`Código del permiso a ${concedido ? 'conceder' : 'revocar'}:`)
+    const motivo = window.prompt('Justificación (mínimo 10 caracteres):')
+    if (!codigo || !motivo || motivo.trim().length < 10) return
+    try {
+      const permiso = (await maestroApi.permisos()).find(p => p.codigo === codigo)
+      if (!permiso) return window.alert('El código no pertenece al catálogo cerrado.')
+      await maestroApi.excepcionUsuario(u.id, permiso.id, concedido, motivo)
+      window.alert(`Permiso ${concedido ? 'concedido' : 'revocado'} y registrado.`)
+    } catch { window.alert('No fue posible registrar la excepción de permiso.') }
+  }
 
   const lista = usuarios.filter(u =>
     (ambito === 'Todas' || donde(u) === ambito) &&
@@ -96,6 +107,8 @@ export const UsuariosPlataforma = () => {
               {u.estado[0] + u.estado.slice(1).toLowerCase()}</Pill></td>
             <td className="num td-sub">{u.ultimoAcceso ?? 'Nunca'}</td>
             <td style={{ textAlign: 'right' }}>
+              <button className="btn sm" onClick={() => excepcion(u, true)}>Conceder</button>{' '}
+              <button className="btn sm" onClick={() => excepcion(u, false)}>Revocar</button>{' '}
               <button className="btn sm" onClick={() => setConfirmar(u)}>
                 {u.estado === 'BLOQUEADO' ? 'Reactivar' : 'Bloquear'}
               </button>
