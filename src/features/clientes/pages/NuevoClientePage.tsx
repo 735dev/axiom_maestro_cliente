@@ -1,12 +1,12 @@
 import React, { useState } from 'react'
-import { SERVICIOS, RANGOS_INGRESO, type Persona } from '../types/cliente.types'
+import { SERVICIOS, RANGOS_INGRESO, type Cliente, type Persona } from '../types/cliente.types'
 import { Card, Field, Pill, Paginador } from '@/shared/ui'
 import { usePaginacion } from '@/shared/hooks/usePaginacion'
 import * as V from '../schemas/cliente.schema'
 import { useEmpresaActual } from '@/shared/hooks/useEmpresaActual'
 import { useAppDispatch, useAppSelector } from '@/shared/store/hooks'
 import { selectCatalogosDe } from '@/features/catalogos/store/catalogosSlice'
-import { crearCliente } from '../store/clientesSlice'
+import { crearCliente, guardarBorradorPortal } from '../store/clientesSlice'
 import { columnasSeccion } from '@/shared/utils/anchoGrid'
 
 /**
@@ -35,21 +35,42 @@ const VACIO = {
   montoDeclarado: '', frecuencia: 'Mensual',
 }
 
+type Props = {
+  onListo: () => void
+  onCancelar?: () => void
+  /** El portal entrega el borrador encontrado por RIF para continuar sin perder datos. */
+  borrador?: Cliente | null
+  onBorradorGuardado?: (cliente: Cliente) => void
+}
+
+const datosIniciales = (borrador?: Cliente | null) => borrador ? {
+  ...VACIO,
+  razonSocial: borrador.razonSocial, rif: borrador.rif, tipo: borrador.tipo,
+  registroNumero: borrador.registroNumero ?? '', registroTomo: borrador.registroTomo ?? '',
+  registroFolio: borrador.registroFolio ?? '', capitalSuscrito: borrador.capitalSuscrito ?? '',
+  capitalActual: borrador.capitalActual ?? '', sector: borrador.sector, domicilio: borrador.domicilio,
+  telefono: borrador.telefono, correo: borrador.correo, web: borrador.web, redes: borrador.redes ?? '',
+  actividad: borrador.actividad, actividadDetalle: borrador.actividadDetalle ?? '',
+  origenFondos: borrador.origenFondos, ingresos: borrador.ingresos, montoDeclarado: borrador.montoDeclarado,
+  frecuencia: borrador.frecuencia,
+} : { ...VACIO }
+
 /** `onCancelar` opcional: en el portal público no hay a dónde volver. */
-export const NuevoClientePage: React.FC<{ onListo: () => void; onCancelar?: () => void }> = ({ onListo, onCancelar }) => {
-  const [paso, setPaso] = useState(1)
+export const NuevoClientePage: React.FC<Props> = ({ onListo, onCancelar, borrador, onBorradorGuardado }) => {
+  const [paso, setPaso] = useState(borrador?.pasoAlcanzado ?? 1)
   // El asistente es secuencial: no se abre un bloque sin cerrar el anterior.
-  const [desbloqueado, setDesbloqueado] = useState(1)
-  const [d, setD] = useState(VACIO)
+  const [desbloqueado, setDesbloqueado] = useState(borrador?.pasoAlcanzado ?? 1)
+  const [d, setD] = useState(() => datosIniciales(borrador))
   // Un campo solo muestra su error después de que el usuario lo tocó.
   const [tocado, setTocado] = useState<Record<string, boolean>>({})
   const marcar = (k: string) => () => setTocado(t => ({ ...t, [k]: true }))
-  const [personas, setPersonas] = useState<Persona[]>([])
-  const [servicios, setServicios] = useState<string[]>([])
+  const [personas, setPersonas] = useState<Persona[]>(() => borrador?.personas ?? [])
+  const [servicios, setServicios] = useState<string[]>(() => borrador?.servicios ?? [])
   const dispatch = useAppDispatch()
   const empresa = useEmpresaActual()
   const usuario = useAppSelector(s => s.auth.usuario)
-  const rifsExistentes = useAppSelector(s => s.clientes.lista.map(c => c.rif))
+  const proximoCodigo = useAppSelector(s => s.clientes.proximoCodigo)
+  const rifsExistentes = useAppSelector(s => s.clientes.lista.filter(c => c.codigo !== borrador?.codigo).map(c => c.rif))
   const CATALOGOS = useAppSelector(selectCatalogosDe(empresa?.id))
 
   const set = (k: keyof typeof VACIO) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) =>
@@ -105,33 +126,39 @@ export const NuevoClientePage: React.FC<{ onListo: () => void; onCancelar?: () =
   /** Solo se puede volver a un bloque ya desbloqueado. Hacia adelante, ver avanzar(). */
   const irA = (n: number) => { if (n <= desbloqueado) setPaso(n) }
 
+  const construirCliente = (estado: Cliente['estado'], pasoAlcanzado: number): Omit<Cliente, 'codigo'> => ({
+    ...d,
+    empresaId: empresa?.id ?? '',
+    montoDeclarado: d.montoDeclarado ? V.formatearMonto(d.montoDeclarado) : '',
+    capitalSuscrito: d.capitalSuscrito ? V.formatearMonto(d.capitalSuscrito) : '',
+    capitalActual: d.capitalActual ? V.formatearMonto(d.capitalActual) : '',
+    registro: [d.registroNumero && `N.º ${d.registroNumero}`, d.registroTomo && `Tomo ${d.registroTomo}`, d.registroFolio && `Folio ${d.registroFolio}`].filter(Boolean).join(', '),
+    servicios, estado, pasoAlcanzado, personas,
+    registradoPor: usuario?.nombre ?? 'El propio cliente',
+    fechaRegistro: borrador?.fechaRegistro ?? new Date().toISOString().slice(0, 10),
+  })
+
+  const guardarAvancePortal = (estado: Cliente['estado'], pasoAlcanzado: number) => {
+    const cliente = construirCliente(estado, pasoAlcanzado)
+    const codigo = borrador?.codigo ?? String(proximoCodigo).padStart(3, '0')
+    dispatch(guardarBorradorPortal({ codigo: borrador?.codigo, cliente, usuario: usuario?.nombre ?? 'Portal público', rol: usuario?.rol ?? 'Cliente' }))
+    onBorradorGuardado?.({ ...cliente, codigo })
+  }
+
   /** Avanza si el bloque actual está completo; si no, marca sus campos y se queda. */
   const avanzar = () => {
     setTocado(t => ({ ...t, ...Object.fromEntries(CAMPOS_PASO[paso].map(k => [k, true])) }))
     if (!valido[paso]) return
     const siguiente = Math.min(paso + 1, PASOS.length)
+    if (onBorradorGuardado) guardarAvancePortal('BORRADOR', siguiente)
     setDesbloqueado(d => Math.max(d, siguiente))
     setPaso(siguiente)
   }
 
   const guardar = () => {
     if (!completo) return
-    dispatch(crearCliente({
-      cliente: {
-        ...d,
-        empresaId: empresa?.id ?? '',
-        montoDeclarado: V.formatearMonto(d.montoDeclarado),
-        capitalSuscrito: d.capitalSuscrito ? V.formatearMonto(d.capitalSuscrito) : '',
-        capitalActual: d.capitalActual ? V.formatearMonto(d.capitalActual) : '',
-        registro: [d.registroNumero && `N.º ${d.registroNumero}`, d.registroTomo && `Tomo ${d.registroTomo}`, d.registroFolio && `Folio ${d.registroFolio}`].filter(Boolean).join(', '),
-        servicios,
-        estado: 'PENDIENTE',
-        registradoPor: usuario?.nombre ?? '—',
-        fechaRegistro: new Date().toISOString().slice(0, 10),
-        personas,
-      },
-      usuario: usuario?.nombre ?? '—', rol: usuario?.rol ?? '—',
-    }))
+    if (onBorradorGuardado) guardarAvancePortal('PENDIENTE', PASOS.length)
+    else dispatch(crearCliente({ cliente: construirCliente('PENDIENTE', PASOS.length), usuario: usuario?.nombre ?? '—', rol: usuario?.rol ?? '—' }))
     onListo()
   }
 

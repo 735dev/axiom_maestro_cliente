@@ -27,6 +27,29 @@ const slice = createSlice({
       s.bitacora.unshift(sellar(a.payload.usuario, a.payload.rol, 'Alta de cliente',
         `${a.payload.cliente.razonSocial} — código ${codigo} asignado`))
     },
+    /**
+     * El portal guarda al cerrar cada bloque. Si ya existe el código, actualiza
+     * únicamente ese borrador; si no, asigna el código único en este primer
+     * guardado. Así el RIF puede retomar el mismo expediente sin duplicarlo.
+     */
+    guardarBorradorPortal(s, a: PayloadAction<{
+      codigo?: string; cliente: Omit<Cliente, 'codigo'>; usuario: string; rol: string
+    }>) {
+      const existente = a.payload.codigo && s.lista.find(c => c.codigo === a.payload.codigo)
+      const esEnvio = a.payload.cliente.estado === 'PENDIENTE'
+      if (existente) {
+        Object.assign(existente, a.payload.cliente)
+        s.bitacora.unshift(sellar(a.payload.usuario, a.payload.rol,
+          esEnvio ? 'Envío de expediente' : 'Guardado de avance',
+          `${existente.razonSocial} — ${esEnvio ? 'expediente enviado' : `bloque ${existente.pasoAlcanzado} guardado`}`))
+        return
+      }
+      const codigo = String(s.proximoCodigo).padStart(3, '0')
+      s.lista.unshift({ ...a.payload.cliente, codigo })
+      s.proximoCodigo += 1
+      s.bitacora.unshift(sellar(a.payload.usuario, a.payload.rol, 'Guardado de avance',
+        `${a.payload.cliente.razonSocial} — código ${codigo} asignado; bloque ${a.payload.cliente.pasoAlcanzado} guardado`))
+    },
     editarCliente(s, a: PayloadAction<{ codigo: string; cambios: Partial<Cliente>; usuario: string; rol: string; motivo: string }>) {
       const c = s.lista.find(x => x.codigo === a.payload.codigo)
       if (!c) return
@@ -60,7 +83,7 @@ const slice = createSlice({
   },
 })
 
-export const { crearCliente, editarCliente, agregarPersona, quitarPersona, cambiarEstadoRegistro } = slice.actions
+export const { crearCliente, guardarBorradorPortal, editarCliente, agregarPersona, quitarPersona, cambiarEstadoRegistro } = slice.actions
 export default slice.reducer
 
 /**

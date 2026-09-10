@@ -259,7 +259,7 @@ input,select,textarea{border-radius:10px}
 .pag.compacto .pag-info{display:none}
 .pag.compacto .pag-nums .btn{padding:4px 7px;font-size:11.5px}
 .val-err{font-size:12.5px;line-height:1.5;color:var(--bad);margin-top:10px}
-.portal-form{max-width:1280px;margin:0 auto;padding:0 20px}
+.portal-form{max-width:1180px;margin:0 auto;padding:0 20px}
 .portal-intro{margin-bottom:22px}
 .portal-intro h1{font-size:24px;font-weight:600;letter-spacing:-.02em}
 .portal-intro p{font-size:14px;color:var(--muted);margin-top:8px;line-height:1.6;max-width:70ch}
@@ -268,8 +268,9 @@ input,select,textarea{border-radius:10px}
  * El riel de pasos es una columna angosta a la izquierda mientras hay
  * espacio de sobra; por debajo de 900px no cabe al lado del contenido, así
  * que pasa a una fila horizontal con scroll arriba del bloque actual. */
-.nc-wizard{display:grid;grid-template-columns:220px 1fr;gap:18px;align-items:start}
+.nc-wizard{display:grid;grid-template-columns:minmax(220px,250px) minmax(0,1fr);gap:24px;align-items:start}
 .nc-pasos{position:sticky;top:18px}
+.nc-pasos .nc-paso{width:100%;text-align:left;border-radius:8px}
 .nc-paso{display:block;width:100%;text-align:left;border:0;cursor:pointer;padding:10px 11px;border-radius:9px;margin-bottom:3px}
 @media(max-width:900px){
   .nc-wizard{grid-template-columns:1fr;gap:12px}

@@ -56,7 +56,12 @@ export const PortalPublicoPage = () => {
                         RIF retoma exactamente donde se quedó.</>}
                   </p>
                 </div>
-                <NuevoClientePage onListo={() => { setEnviado(true); setRetomado(null) }} />
+                <NuevoClientePage
+                  key={retomado?.codigo ?? 'nuevo'}
+                  borrador={retomado}
+                  onBorradorGuardado={setRetomado}
+                  onListo={() => { setEnviado(true); setRetomado(null) }}
+                />
               </div>}
       </div>
 
