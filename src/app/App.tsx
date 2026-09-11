@@ -24,7 +24,8 @@ import { PlataformaPage } from '@/features/plataforma/pages/PlataformaPage'
 export function App() {
   return (
     <Routes>
-      <Route path="/" element={<PortalPublicoPage />} />
+      <Route path="/" element={<Navigate to="/transvalor-orinoco-c-a" replace />} />
+      <Route path="/:empresaSlug" element={<PortalPublicoPage />} />
       <Route path="/acceso" element={<LoginPage />} />
       <Route path="/panel/*" element={<RutaProtegida><PanelShell /></RutaProtegida>} />
       {/* La puerta vieja de plataforma queda apuntando a la única que hay. */}

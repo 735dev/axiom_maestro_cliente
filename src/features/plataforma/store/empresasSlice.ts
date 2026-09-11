@@ -23,6 +23,7 @@ export type EstadoEmpresa = 'ACTIVA' | 'SUSPENDIDA'
 
 export type Empresa = {
   id: string
+  slug: string
   nombre: string
   rif: string
   /** Subdominio del portal público de esa empresa. */
@@ -90,7 +91,7 @@ const est = (id: string, seccion: string, clave: string, obligatorio = true, ext
 export const EMPRESAS_INICIALES: Empresa[] = [
   {
     // Sujeto obligado completo: usa todo el catálogo.
-    id: 'transvalor', nombre: 'Transvalor', rif: 'J-30512345-9',
+    id: 'transvalor', slug: 'transvalor-orinoco-c-a', nombre: 'Transvalor', rif: 'J-30512345-9',
     dominio: 'registro.transvalor.com', estado: 'ACTIVA', desde: '2026-09-01',
     formulario: transvalor([
         { id: 'b1', nombre: 'Datos de la empresa', sub: 'Quién es la compañía.' },
@@ -129,7 +130,7 @@ export const EMPRESAS_INICIALES: Empresa[] = [
   },
   {
     // No hace screening de personas: su formulario es corto y no toca PEP.
-    id: 'demo-seguros', nombre: 'Seguros del Centro', rif: 'J-31998877-1',
+    id: 'demo-seguros', slug: 'empresa-demo-dos-c-a', nombre: 'Seguros del Centro', rif: 'J-31998877-1',
     dominio: 'clientes.segurosdelcentro.com', estado: 'ACTIVA', desde: '2026-08-15',
     formulario: [v1(
       [
@@ -148,7 +149,7 @@ export const EMPRESAS_INICIALES: Empresa[] = [
   },
   {
     // Recién dada de alta: el formulario está en blanco.
-    id: 'demo-casa', nombre: 'Casa de Bolsa Andina', rif: 'J-40223344-7',
+    id: 'demo-casa', slug: 'casa-de-bolsa-andina', nombre: 'Casa de Bolsa Andina', rif: 'J-40223344-7',
     dominio: 'registro.cbandina.com', estado: 'SUSPENDIDA', desde: '2026-06-02',
     formulario: [v1([], [], '2026-06-02')],
   },
@@ -184,7 +185,7 @@ const slice = createSlice({
       prepare: (d: DatosAlta) => ({ payload: { ...d, id: 'e' + nanoid(8) } }),
       reducer: (s: State, a: PayloadAction<DatosAlta & { id: string }>) => {
         s.lista.push({
-          id: a.payload.id, nombre: a.payload.nombre, rif: a.payload.rif,
+          id: a.payload.id, slug: a.payload.nombre.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, ''), nombre: a.payload.nombre, rif: a.payload.rif,
           dominio: a.payload.dominio, estado: 'ACTIVA', desde: HOY,
           formulario: [{
             version: 1, desde: HOY, publicadaPor: 'Axiom Core Tech',

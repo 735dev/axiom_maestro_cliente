@@ -1,9 +1,11 @@
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
+import { useParams } from 'react-router-dom'
 import { useAppSelector } from '@/shared/store/hooks'
 import { Modal, Field, Pill } from '@/shared/ui'
 import { NuevoClientePage } from '@/features/clientes/pages/NuevoClientePage'
 import { RIF_RE } from '@/features/clientes/schemas/cliente.schema'
 import type { Cliente } from '@/features/clientes/types/cliente.types'
+import { maestroApi, type ApiEmpresaPortal } from '@/shared/api/maestro'
 
 const PASOS = ['Identificación', 'Contacto', 'Estructura accionaria', 'Perfil financiero']
 
@@ -15,19 +17,31 @@ const PASOS = ['Identificación', 'Contacto', 'Estructura accionaria', 'Perfil f
  * decide qué corresponde según lo que encuentre.
  */
 export const PortalPublicoPage = () => {
+  const { empresaSlug } = useParams<{ empresaSlug: string }>()
   const clientes = useAppSelector(s => s.clientes.lista)
+  const [empresa, setEmpresa] = useState<ApiEmpresaPortal | null>(null)
+  const [empresaNoEncontrada, setEmpresaNoEncontrada] = useState(false)
   const [pidiendoRif, setPidiendoRif] = useState(false)
   /** Expediente que el cliente retomó con su RIF. */
   const [retomado, setRetomado] = useState<Cliente | null>(null)
   const [enviado, setEnviado] = useState(false)
 
+  useEffect(() => {
+    if (!empresaSlug) return
+    setEmpresa(null); setEmpresaNoEncontrada(false)
+    maestroApi.empresaPortal(empresaSlug).then(setEmpresa).catch(() => setEmpresaNoEncontrada(true))
+  }, [empresaSlug])
+
   const buscar = (rif: string) => clientes.find(c => c.rif === rif.trim().toUpperCase())
+
+  if (empresaNoEncontrada) return <div className="portal"><div className="portal-body"><div className="portal-card"><h1>Empresa no encontrada</h1><p>Verifique el enlace recibido.</p></div></div></div>
+  if (!empresa) return <div className="portal"><div className="portal-body"><div className="portal-card"><p>Verificando empresa…</p></div></div></div>
 
   return (
     <div className="portal">
       <header className="portal-top">
         <div>
-          <b>Transvalor</b>
+          <b>{empresa.nombre}</b>
           <span>Registro de clientes</span>
         </div>
         <div className="portal-rif">

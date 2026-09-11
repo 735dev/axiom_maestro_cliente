@@ -8,8 +8,8 @@ import type { Empresa } from '@/features/plataforma/store/empresasSlice'
  * la URL o de un parámetro, porque eso es justamente lo que permitiría pedir
  * los datos de otra.
  *
- * Sin sesión estamos en el portal público, y ahí la decide el dominio por el
- * que entró el cliente: cada empresa tiene el suyo.
+ * Sin sesión estamos en el portal público y la empresa viene del slug de la
+ * ruta. No hay fallback a la primera activa.
  */
 export function useEmpresaActual(): Empresa | undefined {
   const empresas = useAppSelector(s => s.empresas.lista)
@@ -17,7 +17,6 @@ export function useEmpresaActual(): Empresa | undefined {
 
   if (empresaId) return empresas.find(e => e.id === empresaId)
 
-  return empresas.find(e => e.dominio === window.location.host && e.estado === 'ACTIVA')
-    // En el prototipo no hay dominios reales: se cae a la primera activa.
-    ?? empresas.find(e => e.estado === 'ACTIVA')
+  const slug = window.location.pathname.split('/').filter(Boolean)[0]
+  return empresas.find(e => e.slug === slug && e.estado === 'ACTIVA')
 }

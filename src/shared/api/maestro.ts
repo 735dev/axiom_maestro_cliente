@@ -15,6 +15,7 @@ export type ApiPermiso = { id: string; codigo: string; nombre: string; descripci
 export type ApiRol = { id: string; codigo: string; nombre: string; descripcion?: string; es_predefinido: boolean; empresa_id?: string | null; permisos: ApiPermiso[] }
 export type ApiUsuario = { id: string; empresa_id?: string | null; ambito: string; email: string; nombre_completo: string; rol_id?: string | null; status: string; permisos_efectivos: string[] }
 export type ApiFormulario = { numero_version: number; motivo: string; publicado_en: string; secciones: Array<{ id: string; nombre: string; orden: number; campos: Array<{ id: string; codigo: string; etiqueta: string; tipo_campo: string; orden: number; obligatorio: boolean; es_estandar: boolean; catalogo_ref?: string | null; ancho: string; condiciones_visibilidad?: unknown }> }> }
+export type ApiEmpresaPortal = { slug: string; nombre: string }
 
 export const maestroApi = {
   login: (correo: string, clave: string) => httpClient.post<{ access_token: string }>('/auth/token', new URLSearchParams({ username: correo, password: clave }), { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }).then(r => r.data),
@@ -30,4 +31,5 @@ export const maestroApi = {
     httpClient.post(`/administracion/usuarios/${id}/permisos`, { permiso_id, concedido, motivo }),
   formularioVigente: () => httpClient.get<ApiEnvelope<ApiFormulario>>('/formulario/').then(r => r.data.data),
   publicarFormulario: (payload: unknown) => httpClient.post('/formulario/versiones', payload).then(r => r.data),
+  empresaPortal: (slug: string) => httpClient.get<ApiEnvelope<ApiEmpresaPortal>>(`/portal/${encodeURIComponent(slug)}`).then(r => r.data.data),
 }
