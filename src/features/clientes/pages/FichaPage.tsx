@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { type Cliente, type Persona } from '../types/cliente.types'
 import { Card, Tabs, Field, Modal, Paginador } from '@/shared/ui'
 import { usePaginacion } from '@/shared/hooks/usePaginacion'
@@ -9,6 +9,8 @@ import { editarCliente, agregarPersona, quitarPersona, cambiarEstadoRegistro } f
 import { useCan } from '@/shared/hooks/useCan'
 import { useEmpresaActual } from '@/shared/hooks/useEmpresaActual'
 import { PERMISSIONS } from '@/shared/auth/permissions'
+import { maestroApi } from '@/shared/api/maestro'
+import { reemplazarPersonasCliente } from '../store/clientesSlice'
 
 export const MaestroFicha: React.FC<{ codigo: string; onBack: () => void }> = ({ codigo, onBack }) => {
   const cliente = useAppSelector(s => s.clientes.lista.find(c => c.codigo === codigo))
@@ -17,6 +19,29 @@ export const MaestroFicha: React.FC<{ codigo: string; onBack: () => void }> = ({
   const usuario = useAppSelector(s => s.auth.usuario)
   const dispatch = useAppDispatch()
   const can = useCan()
+
+  useEffect(() => {
+    if (!cliente?.empresaId || !cliente.codigo) return
+    // La ficha siempre lee vinculados del backend: el listado Redux solo es
+    // una vista de navegación y no debe mostrar datos antiguos o vacíos.
+    maestroApi.clientes({ count: 100, estado: 'todos' }).then(({ data }) => {
+      const apiCliente = data.find(c => c.codigo === cliente.codigo)
+      if (!apiCliente) return
+      setApiClienteId(apiCliente.id)
+      return maestroApi.personasVinculadas(apiCliente.id).then(personas => {
+        const rol: Record<string, Persona['rol']> = {
+          accionista: 'Accionista', beneficiario_final: 'Beneficiario final', representante_legal: 'Representante legal',
+        }
+        dispatch(reemplazarPersonasCliente({ codigo, personas: personas.map(p => ({
+          id: p.id,
+          nombre: [p.primer_nombre, p.segundo_nombre, p.primer_apellido, p.segundo_apellido].filter(Boolean).join(' '),
+          documento: p.documento ?? '', nacionalidad: p.nacionalidad === 'VEN' ? 'Venezolana' : (p.nacionalidad ?? ''),
+          rol: rol[p.rol_vinculo] ?? 'Beneficiario final', porcentaje: p.porcentaje_participacion == null ? undefined : Number(p.porcentaje_participacion),
+          cargo: p.cargo ?? undefined, pep: p.es_pep,
+        })) }))
+      })
+    }).catch(() => undefined)
+  }, [codigo, cliente?.empresaId, cliente?.codigo, dispatch])
 
   const [tab, setTab] = useState('Datos de la empresa')
   const [editando, setEditando] = useState(false)
@@ -28,6 +53,7 @@ export const MaestroFicha: React.FC<{ codigo: string; onBack: () => void }> = ({
   const [inhabilitar, setInhabilitar] = useState(false)
   // Aprobar y rechazar comparten un mismo diálogo: solo cambia el veredicto.
   const [decision, setDecision] = useState<'APROBADO' | 'RECHAZADO' | null>(null)
+  const [apiClienteId, setApiClienteId] = useState<string | null>(null)
 
   if (!cliente) return <div className="empty">Cliente no encontrado.</div>
   const puedeEditar = can(PERMISSIONS.registrosEditar)
@@ -47,10 +73,15 @@ export const MaestroFicha: React.FC<{ codigo: string; onBack: () => void }> = ({
     setEditando(false); setConfirmar(false); setBorrador({}); setMotivo('')
   }
 
-  const decidir = () => {
+  const decidir = async () => {
     if (!decision) return
-    dispatch(cambiarEstadoRegistro({ codigo, estado: decision, usuario: usuario!.nombre, rol: usuario!.rol, motivo }))
-    setDecision(null); setMotivo('')
+    try {
+      if (!apiClienteId) throw new Error('Cliente no encontrado en el servidor')
+      if (decision === 'APROBADO') await maestroApi.aprobarCliente(apiClienteId, motivo)
+      else await maestroApi.rechazarCliente(apiClienteId, motivo)
+      dispatch(cambiarEstadoRegistro({ codigo, estado: decision, usuario: usuario!.nombre, rol: usuario!.rol, motivo }))
+      setDecision(null); setMotivo('')
+    } catch { window.alert('No fue posible registrar la decisión en el servidor.') }
   }
 
   const campo = (label: string, k: keyof Cliente, opciones?: string[]) =>

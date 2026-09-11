@@ -10,8 +10,11 @@ import type { Estado } from '../types/cliente.types'
  */
 export const EstadoPill: React.FC<{ e: Estado }> = ({ e }) => {
   const k = e === 'APROBADO' ? 'ok'
-    : e === 'RECHAZADO' || e === 'INHABILITADO' ? 'bad'
-    : e === 'EN REVISIÓN' || e === 'REVISADO' ? 'warn'
+    : e === 'RECHAZADO' ? 'bad'
+    : e === 'INHABILITADO' ? 'dark'
+    : e === 'PENDIENTE' ? 'warn'
+    : e === 'EN REVISIÓN' ? 'info'
+    : e === 'REVISADO' ? 'decision'
     : 'mut'
   return <Pill k={k}>{e[0] + e.slice(1).toLowerCase()}</Pill>
 }

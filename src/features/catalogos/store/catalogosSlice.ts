@@ -17,6 +17,12 @@ type State = { porEmpresa: Record<string, Record<string, string[]>> }
 const iniciales = () =>
   Object.fromEntries(CATALOGOS_PLATAFORMA.map(c => [c.id, [...c.inicial]]))
 
+// Mientras se sincroniza el catálogo específico de una empresa real, el
+// formulario puede trabajar con los valores iniciales de plataforma. Es una
+// referencia estable y evita que una empresa cuyo UUID no exista aún en el
+// store local quede con selects vacíos.
+const CATALOGOS_INICIALES = iniciales()
+
 const initialState: State = {
   porEmpresa: {
     transvalor: iniciales(),
@@ -68,7 +74,7 @@ export default slice.reducer
  */
 export const selectCatalogosDeMiEmpresa = (s: RootState): Record<string, string[]> => {
   const empresaId = s.auth.usuario?.empresaId
-  return empresaId ? s.catalogos?.porEmpresa?.[empresaId] ?? {} : {}
+  return empresaId ? s.catalogos?.porEmpresa?.[empresaId] ?? CATALOGOS_INICIALES : CATALOGOS_INICIALES
 }
 
 /**
@@ -79,4 +85,4 @@ export const selectCatalogosDeMiEmpresa = (s: RootState): Record<string, string[
  * de plataforma, que mira empresas ajenas.
  */
 export const selectCatalogosDe = (empresaId: string | undefined) => (s: RootState): Record<string, string[]> =>
-  empresaId ? s.catalogos?.porEmpresa?.[empresaId] ?? {} : {}
+  empresaId ? s.catalogos?.porEmpresa?.[empresaId] ?? CATALOGOS_INICIALES : CATALOGOS_INICIALES

@@ -14,9 +14,11 @@ import { EstadoPill } from '@/features/clientes/components/Pills'
 import { Barras } from '../components/Barras'
 import type { Cliente } from '@/features/clientes/types/cliente.types'
 
-/** En el prototipo la fecha es fija; el sistema real usa la del servidor. */
-const HOY = '2026-09-01'
-const dias = (desde: string) => Math.round((Date.parse(HOY) - Date.parse(desde)) / 86400000)
+/** Antigüedad real del expediente, nunca una fecha fija de demostración. */
+const dias = (desde: string) => {
+  const fecha = desde.includes('T') ? desde : `${desde}T00:00:00`
+  return Math.max(0, Math.floor((Date.now() - Date.parse(fecha)) / 86400000))
+}
 const fmt = (iso: string) => iso.replace('T', ' ').replace(/[Z.].*$/, '').slice(0, 16)
 
 const ESTADOS = ['BORRADOR', 'PENDIENTE', 'EN REVISIÓN', 'REVISADO', 'APROBADO', 'RECHAZADO', 'INHABILITADO'] as const

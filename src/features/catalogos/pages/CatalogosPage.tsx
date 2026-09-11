@@ -1,13 +1,14 @@
-import React, { useState, useMemo } from 'react'
+import React, { useState, useMemo, useEffect } from 'react'
 import { Listado, Pill, Modal, Field } from '@/shared/ui'
 import { useAppDispatch, useAppSelector } from '@/shared/store/hooks'
-import { agregarValor, quitarValor, selectCatalogosDeMiEmpresa } from '../store/catalogosSlice'
+import { agregarValor, quitarValor as quitarValorLocal, selectCatalogosDeMiEmpresa } from '../store/catalogosSlice'
 import { selectClientesDeMiEmpresa } from '@/features/clientes/store/clientesSlice'
 import { useCan } from '@/shared/hooks/useCan'
 import { useEmpresaActual } from '@/shared/hooks/useEmpresaActual'
 import { versionVigente } from '@/features/plataforma/store/empresasSlice'
 import { PERMISSIONS } from '@/shared/auth/permissions'
 import { catalogoDe, estandarDe } from '@/features/plataforma/formulario/tipos'
+import { maestroApi, type ApiCatalogoValor } from '@/shared/api/maestro'
 
 /**
  * Catálogos de la empresa.
@@ -23,10 +24,24 @@ import { catalogoDe, estandarDe } from '@/features/plataforma/formulario/tipos'
 export const MaestroCatalogos = () => {
   const catalogos = useAppSelector(selectCatalogosDeMiEmpresa)
   const clientes = useAppSelector(selectClientesDeMiEmpresa)
+  const empresaId = useAppSelector(s => s.auth.usuario?.empresaId)
   const empresa = useEmpresaActual()
   const dispatch = useAppDispatch()
   const can = useCan()
   const puede = can(PERMISSIONS.catalogosGestionar)
+  const [catalogosServidor, setCatalogosServidor] = useState<Record<string, string[]>>({})
+  const [registrosServidor, setRegistrosServidor] = useState<Record<string, ApiCatalogoValor[]>>({})
+
+  useEffect(() => {
+    let activo = true
+    maestroApi.catalogosDefiniciones().then(defs =>
+      Promise.all(defs.map(d => maestroApi.catalogoValores(d.clave).then(valores => [d.clave, valores.filter(v => v.activo).map(v => v.valor)] as const)))
+    ).then(valores => { if (activo) setCatalogosServidor(Object.fromEntries(valores)) }).catch(() => undefined)
+    maestroApi.catalogosDefiniciones().then(defs =>
+      Promise.all(defs.map(d => maestroApi.catalogoValores(d.clave).then(valores => [d.clave, valores] as const)))
+    ).then(registros => { if (activo) setRegistrosServidor(Object.fromEntries(registros)) }).catch(() => undefined)
+    return () => { activo = false }
+  }, [])
 
   /** Qué catálogos usa el formulario vigente, y con qué campo cada uno. */
   const enUso = useMemo(() => {
@@ -39,17 +54,20 @@ export const MaestroCatalogos = () => {
     return m
   }, [empresa])
 
-  const ids = Array.from(enUso.keys())
+  const valoresDisponibles = Object.keys(catalogosServidor).length ? catalogosServidor : catalogos
+  const ids = Array.from(enUso.keys()).length ? Array.from(enUso.keys()) : Object.keys(valoresDisponibles)
   const [activo, setActivo] = useState(ids[0] ?? '')
   const seleccionado = ids.includes(activo) ? activo : ids[0]
 
   const [q, setQ] = useState('')
   const [agregando, setAgregando] = useState(false)
+  const [editando, setEditando] = useState<string | null>(null)
   const [valor, setValor] = useState('')
   const [quitando, setQuitando] = useState<string | null>(null)
 
   const def = catalogoDe(seleccionado)
-  const valores = catalogos[seleccionado] ?? []
+  const valores = valoresDisponibles[seleccionado] ?? []
+  const registros = registrosServidor[seleccionado] ?? []
 
   /**
    * Cuántos clientes tienen cada valor. Sale de la columna del campo estándar
@@ -69,8 +87,52 @@ export const MaestroCatalogos = () => {
   }, [valores, clientes, seleccionado, empresa])
 
   const filtrados = valores.filter(v => v.toLowerCase().includes(q.toLowerCase()))
-  const duplicado = valores.some(v => v.toLowerCase() === valor.trim().toLowerCase())
+  const valorOriginal = editando ? registros.find(r => r.id === editando)?.valor : undefined
+  const duplicado = valores.some(v =>
+    v.toLowerCase() === valor.trim().toLowerCase() && v !== valorOriginal,
+  )
   const valido = valor.trim().length >= 2 && !duplicado
+
+  const guardarValor = async () => {
+    if (!empresaId || !valido) return
+    try {
+      const nuevo = await maestroApi.agregarValorCatalogo(seleccionado, valor.trim())
+      setRegistrosServidor(r => ({ ...r, [seleccionado]: [...(r[seleccionado] ?? []), nuevo] }))
+      setCatalogosServidor(c => ({ ...c, [seleccionado]: [...(c[seleccionado] ?? []), nuevo.valor] }))
+      dispatch(agregarValor({ empresaId, catalogo: seleccionado, valor: nuevo.valor }))
+      setAgregando(false)
+    } catch { window.alert('No fue posible agregar el valor al catálogo.') }
+  }
+
+  const quitarValor = async () => {
+    if (!empresaId || !quitando) return
+    try {
+      const registro = registros.find(r => r.valor === quitando && r.activo)
+      if (!registro) throw new Error('Valor no encontrado')
+      await maestroApi.inactivarValorCatalogo(registro.id)
+      setRegistrosServidor(r => ({ ...r, [seleccionado]: (r[seleccionado] ?? []).filter(x => x.id !== registro.id) }))
+      setCatalogosServidor(c => ({ ...c, [seleccionado]: (c[seleccionado] ?? []).filter(x => x !== quitando) }))
+      dispatch(quitarValorLocal({ empresaId, catalogo: seleccionado, valor: quitando }))
+      setQuitando(null)
+    } catch { window.alert('No fue posible quitar el valor del catálogo.') }
+  }
+
+  const editarValor = async () => {
+    if (!empresaId || !editando || !valido) return
+    try {
+      const actualizado = await maestroApi.editarValorCatalogo(editando, valor.trim())
+      setRegistrosServidor(r => ({
+        ...r,
+        [seleccionado]: (r[seleccionado] ?? []).map(x => x.id === editando ? actualizado : x),
+      }))
+      setCatalogosServidor(c => ({
+        ...c,
+        [seleccionado]: (c[seleccionado] ?? []).map(x => x === valorOriginal ? actualizado.valor : x),
+      }))
+      setEditando(null)
+      setValor('')
+    } catch { window.alert('No fue posible editar el valor del catálogo.') }
+  }
 
   if (!ids.length) {
     return (
@@ -113,29 +175,30 @@ export const MaestroCatalogos = () => {
             <td className="num">{uso[v]}</td>
             <td>{uso[v] > 0 ? <Pill k="ok">En uso</Pill> : <Pill k="mut">Sin usar</Pill>}</td>
             <td style={{ textAlign: 'right' }}>
-              {puede && <button className="btn sm" onClick={() => setQuitando(v)}>Quitar</button>}
+              {puede && <span style={{ display: 'inline-flex', gap: 6 }}>
+                <button className="btn sm" onClick={() => {
+                  const registro = registros.find(r => r.valor === v && r.activo)
+                  if (!registro) return
+                  setValor(v)
+                  setEditando(registro.id)
+                }}>Editar</button>
+                <button className="btn sm" onClick={() => setQuitando(v)}>Quitar</button>
+              </span>}
             </td>
           </>
         )}
       />
 
-      {agregando && empresa && (
+      {agregando && empresaId && (
         <Modal title={`Agregar valor a “${def?.nombre}”`} onClose={() => setAgregando(false)}
           footer={<><button className="btn" onClick={() => setAgregando(false)}>Cancelar</button>
-            <button className="btn pri" disabled={!valido}
-              onClick={() => {
-                dispatch(agregarValor({ empresaId: empresa.id, catalogo: seleccionado, valor }))
-                setAgregando(false)
-              }}>Agregar</button></>}>
+            <button className="btn pri" disabled={!valido} onClick={guardarValor}>Agregar</button></>}>
           <Field label="Nuevo valor"
             error={duplicado ? 'Ese valor ya está en el catálogo.' : undefined}
             hint={!duplicado ? 'Aparece de inmediato en el formulario de sus clientes.' : undefined}>
             <input autoFocus value={valor} onChange={e => setValor(e.target.value)}
               onKeyDown={e => {
-                if (e.key === 'Enter' && valido) {
-                  dispatch(agregarValor({ empresaId: empresa.id, catalogo: seleccionado, valor }))
-                  setAgregando(false)
-                }
+                if (e.key === 'Enter' && valido) void guardarValor()
               }}
               placeholder="Escriba el valor" />
           </Field>
@@ -145,14 +208,22 @@ export const MaestroCatalogos = () => {
         </Modal>
       )}
 
-      {quitando && empresa && (
+      {editando && empresaId && (
+        <Modal title={`Editar valor de “${def?.nombre}”`} onClose={() => { setEditando(null); setValor('') }}
+          footer={<><button className="btn" onClick={() => { setEditando(null); setValor('') }}>Cancelar</button>
+            <button className="btn pri" disabled={!valido} onClick={editarValor}>Guardar cambios</button></>}>
+          <Field label="Valor" error={duplicado ? 'Ese valor ya está en el catálogo.' : undefined}>
+            <input autoFocus value={valor} onChange={e => setValor(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter' && valido) void editarValor() }} />
+          </Field>
+          <p className="dlg-txt">El cambio se aplicará a los nuevos formularios. Los datos ya guardados no se modifican.</p>
+        </Modal>
+      )}
+
+      {quitando && empresaId && (
         <Modal title="Quitar del catálogo" onClose={() => setQuitando(null)}
           footer={<><button className="btn" onClick={() => setQuitando(null)}>Cancelar</button>
-            <button className="btn pri"
-              onClick={() => {
-                dispatch(quitarValor({ empresaId: empresa.id, catalogo: seleccionado, valor: quitando }))
-                setQuitando(null)
-              }}>Quitar</button></>}>
+            <button className="btn pri" onClick={quitarValor}>Quitar</button></>}>
           <p className="dlg-txt">Se quitará <b>{quitando}</b> de <b>{def?.nombre}</b>.</p>
           {uso[quitando] > 0 ? (
             <p className="dlg-txt">

@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import { SERVICIOS, RANGOS_INGRESO, type Cliente, type Persona } from '../types/cliente.types'
 import { Card, Field, Pill, Paginador } from '@/shared/ui'
 import { usePaginacion } from '@/shared/hooks/usePaginacion'
@@ -8,6 +8,9 @@ import { useAppDispatch, useAppSelector } from '@/shared/store/hooks'
 import { selectCatalogosDe } from '@/features/catalogos/store/catalogosSlice'
 import { crearCliente, guardarBorradorPortal } from '../store/clientesSlice'
 import { columnasSeccion } from '@/shared/utils/anchoGrid'
+import { httpClient } from '@/shared/api/client'
+import { maestroApi } from '@/shared/api/maestro'
+import { CATALOGOS_PLATAFORMA } from '@/features/plataforma/formulario/tipos'
 
 /**
  * Cuántas columnas le tocan a un bloque de `n` campos cortos. Este asistente
@@ -70,8 +73,12 @@ export const NuevoClientePage: React.FC<Props> = ({ onListo, onCancelar, borrado
   const empresa = useEmpresaActual()
   const usuario = useAppSelector(s => s.auth.usuario)
   const proximoCodigo = useAppSelector(s => s.clientes.proximoCodigo)
-  const rifsExistentes = useAppSelector(s => s.clientes.lista.filter(c => c.codigo !== borrador?.codigo).map(c => c.rif))
+  const clientes = useAppSelector(s => s.clientes?.lista ?? [])
+  const rifsExistentes = useMemo(() => clientes.filter(c => c.codigo !== borrador?.codigo).map(c => c.rif), [clientes, borrador?.codigo])
   const CATALOGOS = useAppSelector(selectCatalogosDe(empresa?.id))
+  const opcionesCatalogo = (id: string) => CATALOGOS[id]?.length
+    ? CATALOGOS[id]
+    : (CATALOGOS_PLATAFORMA.find(c => c.id === id)?.inicial ?? [])
 
   const set = (k: keyof typeof VACIO) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) =>
     setD({ ...d, [k]: e.target.value })
@@ -79,6 +86,19 @@ export const NuevoClientePage: React.FC<Props> = ({ onListo, onCancelar, borrado
   // El RIF se normaliza a mayúscula: escribir "j-123..." es correcto.
   const setRif = (e: React.ChangeEvent<HTMLInputElement>) =>
     setD({ ...d, rif: e.target.value.toUpperCase() })
+
+  // El RIF es suficiente para abrir el expediente: se crea al salir del
+  // campo, antes de que el usuario termine el primer bloque.
+  useEffect(() => {
+    if (!onBorradorGuardado || !V.RIF_RE.test(d.rif.trim())) return
+    const slug = window.location.pathname.split('/').filter(Boolean)[0]
+    const rif = d.rif.trim().toUpperCase()
+    const key = `portal-token:${slug}:${rif}`
+    if (localStorage.getItem(key)) return
+    httpClient.post(`/portal/${encodeURIComponent(slug)}/borradores`, { rif })
+      .then(r => { const token = r.data?.data?.token; if (token) localStorage.setItem(key, token) })
+      .catch(() => undefined)
+  }, [d.rif, onBorradorGuardado])
 
   const accionistas = personas.filter(p => p.rol === 'Accionista')
   const suma = accionistas.reduce((a, p) => a + (p.porcentaje || 0), 0)
@@ -128,7 +148,7 @@ export const NuevoClientePage: React.FC<Props> = ({ onListo, onCancelar, borrado
 
   const construirCliente = (estado: Cliente['estado'], pasoAlcanzado: number): Omit<Cliente, 'codigo'> => ({
     ...d,
-    empresaId: empresa?.id ?? '',
+    empresaId: usuario?.empresaId ?? empresa?.id ?? '',
     montoDeclarado: d.montoDeclarado ? V.formatearMonto(d.montoDeclarado) : '',
     capitalSuscrito: d.capitalSuscrito ? V.formatearMonto(d.capitalSuscrito) : '',
     capitalActual: d.capitalActual ? V.formatearMonto(d.capitalActual) : '',
@@ -138,11 +158,41 @@ export const NuevoClientePage: React.FC<Props> = ({ onListo, onCancelar, borrado
     fechaRegistro: borrador?.fechaRegistro ?? new Date().toISOString().slice(0, 10),
   })
 
-  const guardarAvancePortal = (estado: Cliente['estado'], pasoAlcanzado: number) => {
+  const guardarAvancePortal = async (estado: Cliente['estado'], pasoAlcanzado: number): Promise<boolean> => {
     const cliente = construirCliente(estado, pasoAlcanzado)
     const codigo = borrador?.codigo ?? String(proximoCodigo).padStart(3, '0')
     dispatch(guardarBorradorPortal({ codigo: borrador?.codigo, cliente, usuario: usuario?.nombre ?? 'Portal público', rol: usuario?.rol ?? 'Cliente' }))
     onBorradorGuardado?.({ ...cliente, codigo })
+    const slug = window.location.pathname.split('/').filter(Boolean)[0]
+    const key = `portal-token:${slug}:${cliente.rif}`
+    const token = localStorage.getItem(key)
+    const crear = async () => {
+      const r = await httpClient.post(`/portal/${encodeURIComponent(slug)}/borradores`, { rif: cliente.rif })
+      const data = r.data?.data
+      // El RIF ya fue enviado: el servidor no devuelve token y no se debe
+      // seguir mostrando un formulario con un token muerto.
+      if (!data?.token) {
+        localStorage.removeItem(key)
+        onBorradorGuardado?.({ ...cliente, codigo, estado: 'PENDIENTE' })
+        return false
+      }
+      localStorage.setItem(key, data.token)
+      await httpClient.patch(`/portal/${encodeURIComponent(slug)}/borradores/${encodeURIComponent(data.token)}/pasos/${pasoAlcanzado}`, { respuestas: cliente })
+      return true
+    }
+    try {
+      if (token) {
+        await httpClient.patch(`/portal/${encodeURIComponent(slug)}/borradores/${encodeURIComponent(token)}/pasos/${pasoAlcanzado}`, { respuestas: cliente })
+        return true
+      }
+      return await crear()
+    } catch (error: any) {
+      if (error?.response?.status === 404) {
+        localStorage.removeItem(key)
+        try { return await crear() } catch { return false }
+      }
+      return false
+    }
   }
 
   /** Avanza si el bloque actual está completo; si no, marca sus campos y se queda. */
@@ -155,10 +205,23 @@ export const NuevoClientePage: React.FC<Props> = ({ onListo, onCancelar, borrado
     setPaso(siguiente)
   }
 
-  const guardar = () => {
+  const guardar = async () => {
     if (!completo) return
-    if (onBorradorGuardado) guardarAvancePortal('PENDIENTE', PASOS.length)
-    else dispatch(crearCliente({ cliente: construirCliente('PENDIENTE', PASOS.length), usuario: usuario?.nombre ?? '—', rol: usuario?.rol ?? '—' }))
+    if (onBorradorGuardado) {
+      const guardado = await guardarAvancePortal('PENDIENTE', PASOS.length)
+      if (!guardado) return
+    }
+    else {
+      const cliente = construirCliente('PENDIENTE', PASOS.length)
+      await maestroApi.crearCliente({
+        tipo_persona: 'juridica', documento: cliente.rif, razon_social: cliente.razonSocial,
+        sector_economico: cliente.sector, actividad_economica: cliente.actividadDetalle || cliente.actividad,
+        origen_fondos: cliente.origenFondos, ingresos_estimados: cliente.ingresos,
+        frecuencia_operacion: cliente.frecuencia, direccion: cliente.domicilio,
+        email: cliente.correo || undefined, telefono: cliente.telefono,
+      })
+      dispatch(crearCliente({ cliente, usuario: usuario?.nombre ?? '—', rol: usuario?.rol ?? '—' }))
+    }
     onListo()
   }
 
@@ -270,12 +333,12 @@ export const NuevoClientePage: React.FC<Props> = ({ onListo, onCancelar, borrado
                 <Field label="Actividad económica" error={e('actividad')}>
                   <select value={d.actividad} onChange={set('actividad')} onBlur={marcar('actividad')}>
                     <option value="">Seleccione…</option>
-                    {(CATALOGOS.actividad ?? []).map(v => <option key={v}>{v}</option>)}
+                    {opcionesCatalogo('actividad').map(v => <option key={v}>{v}</option>)}
                   </select>
                 </Field>
                 <Field label="Origen de fondos">
                   <select value={d.origenFondos} onChange={set('origenFondos')}>
-                    {(CATALOGOS.origen_fondos ?? []).map(v => <option key={v}>{v}</option>)}
+                    {opcionesCatalogo('origen_fondos').map(v => <option key={v}>{v}</option>)}
                   </select>
                 </Field>
               </div>
@@ -330,7 +393,7 @@ export const NuevoClientePage: React.FC<Props> = ({ onListo, onCancelar, borrado
               <div className="btn-row">
                 {paso > 1 && <button className="btn" onClick={() => irA(paso - 1)}>Atrás</button>}
                 {paso < PASOS.length
-                  ? <button className="btn pri" onClick={avanzar} disabled={!valido[paso]}>
+                  ? <button className="btn pri" onClick={avanzar}>
                       Guardar y continuar
                     </button>
                   : <button className="btn pri" onClick={guardar} disabled={!completo}>Crear cliente</button>}

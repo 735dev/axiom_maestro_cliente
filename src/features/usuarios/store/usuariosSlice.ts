@@ -1,4 +1,4 @@
-import { createSlice, type PayloadAction } from '@reduxjs/toolkit'
+import { createSelector, createSlice, type PayloadAction } from '@reduxjs/toolkit'
 import { PERMISSIONS, conImplicados, dependenDe, type PermissionCode } from '@/shared/auth/permissions'
 import type { RootState } from '@/shared/store'
 import { crearEmpresa } from '@/features/plataforma/store/empresasSlice'
@@ -237,10 +237,11 @@ export function permisosEfectivos(u: UsuarioSistema, roles: Rol[]): PermissionCo
  * El personal de Axiom tiene `empresaId: null`, así que nunca cae acá: una
  * empresa no ve —ni puede tocar— a quien administra la plataforma.
  */
-export const selectUsuariosDeMiEmpresa = (s: RootState) => {
-  const empresaId = s.auth.usuario?.empresaId
-  return empresaId ? s.usuarios.usuarios.filter(u => u.empresaId === empresaId) : []
-}
+const USUARIOS_VACIOS: UsuarioSistema[] = []
+export const selectUsuariosDeMiEmpresa = createSelector(
+  [(s: RootState) => s.auth.usuario?.empresaId, (s: RootState) => s.usuarios.usuarios],
+  (empresaId, usuarios) => empresaId ? usuarios.filter(u => u.empresaId === empresaId) : USUARIOS_VACIOS,
+)
 
 /** Todo el padrón. Solo para el ámbito plataforma. */
 export const selectTodosLosUsuarios = (s: RootState) =>
@@ -250,10 +251,13 @@ export const selectTodosLosUsuarios = (s: RootState) =>
  * Roles que una empresa puede ver y asignar: los de sistema más los suyos.
  * Los del ámbito plataforma quedan fuera, así no aparecen en su selector.
  */
-export const selectRolesDeMiEmpresa = (s: RootState) => {
-  const empresaId = s.auth.usuario?.empresaId
-  return s.usuarios.roles.filter(r => !r.plataforma && (r.sistema || r.empresaId === empresaId))
-}
+const ROLES_VACIOS: Rol[] = []
+export const selectRolesDeMiEmpresa = createSelector(
+  [(s: RootState) => s.auth.usuario?.empresaId, (s: RootState) => s.usuarios.roles],
+  (empresaId, roles) => empresaId
+    ? roles.filter(r => !r.plataforma && (r.sistema || r.empresaId === empresaId))
+    : ROLES_VACIOS,
+)
 
 /**
  * Las cuentas de Axiom. Sale del mismo padrón que todo el resto: lo único que

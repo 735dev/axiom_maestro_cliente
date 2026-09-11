@@ -14,6 +14,7 @@ export type Ambito = 'plataforma' | 'empresa'
 
 export type Usuario = {
   id: string; nombre: string; rol: string; permisos: string[]
+  email?: string
   ambito: Ambito
   empresaId: string | null
 }

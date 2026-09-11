@@ -1,13 +1,30 @@
 import React, { useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
-import { useAppSelector } from '@/shared/store/hooks'
 import { Modal, Field, Pill } from '@/shared/ui'
 import { NuevoClientePage } from '@/features/clientes/pages/NuevoClientePage'
 import { RIF_RE } from '@/features/clientes/schemas/cliente.schema'
 import type { Cliente } from '@/features/clientes/types/cliente.types'
-import { maestroApi, type ApiEmpresaPortal } from '@/shared/api/maestro'
+import { maestroApi, type ApiEmpresaPortal, type ApiPortalRegistro } from '@/shared/api/maestro'
 
 const PASOS = ['Identificación', 'Contacto', 'Estructura accionaria', 'Perfil financiero']
+
+const clienteDesdePortal = (respuesta: ApiPortalRegistro, rif: string): Cliente => {
+  const d = (respuesta.respuestas ?? {}) as Partial<Cliente> & Record<string, unknown>
+  return {
+    empresaId: '', codigo: respuesta.cliente_codigo ?? '', razonSocial: String(d.razonSocial ?? ''),
+    rif: String(d.rif ?? rif), tipo: String(d.tipo ?? 'Compañía Anónima'), registro: String(d.registro ?? ''),
+    domicilio: String(d.domicilio ?? ''), telefono: String(d.telefono ?? ''), correo: String(d.correo ?? ''),
+    web: String(d.web ?? ''), sector: String(d.sector ?? ''), actividad: String(d.actividad ?? ''),
+    origenFondos: String(d.origenFondos ?? ''), ingresos: String(d.ingresos ?? ''),
+    montoDeclarado: String(d.montoDeclarado ?? ''), frecuencia: String(d.frecuencia ?? ''),
+    estado: respuesta.estado === 'en_progreso' ? 'BORRADOR' : 'PENDIENTE',
+    registradoPor: 'El propio cliente', fechaRegistro: String(d.fechaRegistro ?? new Date().toISOString().slice(0, 10)),
+    pasoAlcanzado: respuesta.paso_actual ?? 1, personas: (d.personas as Cliente['personas']) ?? [],
+    servicios: (d.servicios as string[]) ?? [], actividadDetalle: String(d.actividadDetalle ?? ''),
+    redes: String(d.redes ?? ''), registroNumero: String(d.registroNumero ?? ''), registroTomo: String(d.registroTomo ?? ''),
+    registroFolio: String(d.registroFolio ?? ''), capitalSuscrito: String(d.capitalSuscrito ?? ''), capitalActual: String(d.capitalActual ?? ''),
+  }
+}
 
 /**
  * Portal público del cliente. Vive en `/`, sin sesión y sin nada del panel
@@ -18,7 +35,6 @@ const PASOS = ['Identificación', 'Contacto', 'Estructura accionaria', 'Perfil f
  */
 export const PortalPublicoPage = () => {
   const { empresaSlug } = useParams<{ empresaSlug: string }>()
-  const clientes = useAppSelector(s => s.clientes.lista)
   const [empresa, setEmpresa] = useState<ApiEmpresaPortal | null>(null)
   const [empresaNoEncontrada, setEmpresaNoEncontrada] = useState(false)
   const [pidiendoRif, setPidiendoRif] = useState(false)
@@ -32,7 +48,11 @@ export const PortalPublicoPage = () => {
     maestroApi.empresaPortal(empresaSlug).then(setEmpresa).catch(() => setEmpresaNoEncontrada(true))
   }, [empresaSlug])
 
-  const buscar = (rif: string) => clientes.find(c => c.rif === rif.trim().toUpperCase())
+  const buscar = async (rif: string) => {
+    const normalizado = rif.trim().toUpperCase()
+    const respuesta = await maestroApi.iniciarPortal(empresaSlug!, normalizado)
+    return clienteDesdePortal(respuesta, normalizado)
+  }
 
   if (empresaNoEncontrada) return <div className="portal"><div className="portal-body"><div className="portal-card"><h1>Empresa no encontrada</h1><p>Verifique el enlace recibido.</p></div></div></div>
   if (!empresa) return <div className="portal"><div className="portal-body"><div className="portal-card"><p>Verificando empresa…</p></div></div></div>
@@ -91,19 +111,21 @@ export const PortalPublicoPage = () => {
 
 /* ---------------- Continuar proceso: se pide el RIF ---------------- */
 const PedirRif: React.FC<{
-  buscar: (rif: string) => Cliente | undefined
+  buscar: (rif: string) => Promise<Cliente>
   onClose: () => void
   onRetomar: (c: Cliente) => void
 }> = ({ buscar, onClose, onRetomar }) => {
   const [rif, setRif] = useState('')
   const [error, setError] = useState<string | null>(null)
 
-  const continuar = () => {
+  const continuar = async () => {
     const t = rif.trim().toUpperCase()
     if (!RIF_RE.test(t)) return setError('Formato esperado: J-00000000-0.')
-    const c = buscar(t)
-    if (!c) return setError('No hay ningún registro con ese RIF. Complete el formulario para iniciarlo.')
-    onRetomar(c)
+    try {
+      onRetomar(await buscar(t))
+    } catch {
+      setError('No fue posible abrir el registro. Verifique el RIF e intente nuevamente.')
+    }
   }
 
   return (

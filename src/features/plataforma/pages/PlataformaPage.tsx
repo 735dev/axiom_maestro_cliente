@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Listado, Pill, Modal, Field } from '@/shared/ui'
 import { useAppDispatch, useAppSelector } from '@/shared/store/hooks'
@@ -12,6 +12,7 @@ import { DashboardPlataforma } from './DashboardPlataforma'
 import { AuditoriaPlataforma } from './AuditoriaPlataforma'
 import { UsuariosPlataforma } from './UsuariosPlataforma'
 import { RolesPlataforma } from './RolesPlataforma'
+import { maestroApi, type ApiRetencionBorrador } from '@/shared/api/maestro'
 
 /**
  * Consola de la plataforma. No es una pantalla más del sistema de una empresa:
@@ -29,6 +30,7 @@ const RUTAS = [
   { id: 'usuarios', label: 'Usuarios', titulo: 'Usuarios', sub: 'Todo el padrón: las empresas y también Axiom.' },
   { id: 'roles', label: 'Roles', titulo: 'Roles', sub: 'Quién puede qué, y hasta dónde llega cada rol.' },
   { id: 'auditoria', label: 'Auditoría', titulo: 'Auditoría', sub: 'Todo lo que pasó, en todas las empresas y en Axiom.' },
+  { id: 'retencion', label: 'Retención', titulo: 'Retención de borradores', sub: 'Cuánto tiempo se conservan los registros abandonados.' },
 ] as const
 
 export const PlataformaPage = () => {
@@ -71,11 +73,32 @@ export const PlataformaPage = () => {
               : vista === 'formularios' ? <EditorFormulario />
                 : vista === 'usuarios' ? <UsuariosPlataforma />
                   : vista === 'roles' ? <RolesPlataforma />
-                    : <AuditoriaPlataforma />}
+                    : vista === 'auditoria' ? <AuditoriaPlataforma /> : <RetencionBorradores />}
         </div>
       </main>
     </div>
   )
+}
+
+const RetencionBorradores = () => {
+  const [items, setItems] = useState<ApiRetencionBorrador[]>([])
+  const [cargando, setCargando] = useState(true)
+  const [guardando, setGuardando] = useState<string | null>(null)
+  useEffect(() => { maestroApi.retencionesBorradores().then(setItems).catch(() => undefined).finally(() => setCargando(false)) }, [])
+  const cambiar = async (item: ApiRetencionBorrador, dias: number) => {
+    setGuardando(item.empresa_id)
+    try { setItems(xs => xs.map(x => x.empresa_id === item.empresa_id ? { ...x, dias } : x)); await maestroApi.actualizarRetencionBorradores(item.empresa_id, dias) }
+    catch { window.alert('No fue posible guardar la política.') }
+    finally { setGuardando(null) }
+  }
+  return <Listado
+    titulo="Retención de borradores"
+    sub="La tarea programada inactiva los borradores sin actividad que superen este plazo. Nunca se borran físicamente."
+    datos={items} clave={x => x.empresa_id} etiqueta="empresas"
+    vacio={cargando ? 'Cargando políticas…' : 'No hay empresas configuradas.'}
+    columnas={[{ th: 'Empresa' }, { th: 'Días de retención' }, { th: 'Efecto' }]}
+    fila={x => <><td><b>{x.empresa}</b></td><td><select value={x.dias} disabled={guardando === x.empresa_id} onChange={e => void cambiar(x, Number(e.target.value))}>{[7, 15, 30, 60, 90, 180, 365].map(d => <option key={d} value={d}>{d} días</option>)}</select></td><td className="td-sub">Se inactiva por tarea programada</td></>}
+  />
 }
 
 /* ---------------- Empresas ---------------- */

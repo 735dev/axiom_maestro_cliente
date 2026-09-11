@@ -60,7 +60,7 @@ export const LoginPage = () => {
       dispatch(login({ token: tokenApi.access_token, usuario: { id: '', nombre: '', rol: '', permisos: [], ambito: 'empresa', empresaId: null } }))
       const sesion = await maestroApi.sesion()
       const ambito = sesion.scope === 'platform' ? 'plataforma' : 'empresa'
-      dispatch(login({ token: tokenApi.access_token, usuario: { id: sesion.user_id, nombre: sesion.nombre, rol: sesion.rol, permisos: sesion.permisos, ambito, empresaId: sesion.empresa_id } }))
+      dispatch(login({ token: tokenApi.access_token, usuario: { id: sesion.user_id, nombre: sesion.nombre, email: sesion.email, rol: sesion.rol, permisos: sesion.permisos, ambito, empresaId: sesion.empresa_id } }))
       navigate(destinoDe(ambito), { replace: true })
     } catch {
       dispatch({ type: 'auth/logout' })
@@ -126,17 +126,18 @@ export const LoginPage = () => {
 
           <div className="login-demo">
             <b>Cuentas de prueba</b>
-            {/* Una cuenta por ámbito y una por empresa: sin un administrador de
-                otra empresa no se puede comprobar que cada una ve solo lo suyo. */}
+            {/* Estas cuentas son las que siembra el backend al iniciar la
+                instalación. Contraseña común: Maestro123* */}
             {[
-              usuarios.find(u => u.empresaId === null),
-              usuarios.find(u => u.empresaId === 'transvalor' && u.rolId === 'administrador'),
-              usuarios.find(u => u.empresaId === 'transvalor' && u.rolId === 'oficial'),
-              usuarios.find(u => u.empresaId === 'demo-seguros' && u.rolId === 'administrador'),
-            ].filter(Boolean).map(u => (
-              <button key={u!.id} onClick={() => { setCorreo(u!.correo); setClave('demo'); setError(null) }}>
-                {u!.nombre}
-                <span>{roles.find(r => r.id === u!.rolId)?.nombre} · {donde(u!.empresaId)}</span>
+              { nombre: 'Super Admin — Axiom Core Tech', correo: 'superadmin@axiomcoretech.com', rol: 'Super Admin', empresa: 'Axiom Core Tech' },
+              { nombre: 'Administrador — Transvalor Orinoco, C.A.', correo: 'admin@transvalor.demo', rol: 'Administrador', empresa: 'Transvalor Orinoco, C.A.' },
+              { nombre: 'Comercialización — Transvalor Orinoco, C.A.', correo: 'comercial@transvalor.demo', rol: 'Comercialización', empresa: 'Transvalor Orinoco, C.A.' },
+              { nombre: 'Auditoría — Transvalor Orinoco, C.A.', correo: 'auditoria@transvalor.demo', rol: 'Auditoría', empresa: 'Transvalor Orinoco, C.A.' },
+              { nombre: 'Administrador — Empresa Demo Dos, C.A.', correo: 'admin@demodos.demo', rol: 'Administrador', empresa: 'Empresa Demo Dos, C.A.' },
+            ].map(u => (
+              <button key={u.correo} onClick={() => { setCorreo(u.correo); setClave('Maestro123*'); setError(null) }}>
+                {u.nombre}
+                <span>{u.rol} · {u.empresa}</span>
               </button>
             ))}
           </div>

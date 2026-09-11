@@ -1,3 +1,4 @@
+import { createSelector } from '@reduxjs/toolkit'
 import type { RootState } from '@/shared/store'
 
 /**
@@ -9,16 +10,21 @@ import type { RootState } from '@/shared/store'
  * contra los que tenía cuando se generó el aviso—, que es lo correcto: si le
  * quitaron el permiso, ya no es su aviso.
  */
-export const selectNotificacionesMias = (s: RootState) => {
-  const usuario = s.auth.usuario
-  if (!usuario) return []
-  return s.notificaciones.lista.filter(n => {
+const NOTIFICACIONES_VACIAS: RootState['notificaciones']['lista'] = []
+export const selectNotificacionesMias = createSelector(
+  [(s: RootState) => s.auth.usuario, (s: RootState) => s.notificaciones.lista],
+  (usuario, lista) => {
+    if (!usuario) return NOTIFICACIONES_VACIAS
+    return lista.filter(n => {
     if (n.empresaId !== usuario.empresaId) return false
     return n.destinatario.tipo === 'usuario'
       ? n.destinatario.usuarioId === usuario.id
       : usuario.permisos.includes(n.destinatario.permiso)
-  })
-}
+    })
+  },
+)
 
-export const selectNotificacionesNoLeidas = (s: RootState) =>
-  selectNotificacionesMias(s).filter(n => !n.leida)
+export const selectNotificacionesNoLeidas = createSelector(
+  [selectNotificacionesMias],
+  notificaciones => notificaciones.filter(n => !n.leida),
+)

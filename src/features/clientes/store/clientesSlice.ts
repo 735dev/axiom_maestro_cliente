@@ -1,4 +1,4 @@
-import { createSlice, type PayloadAction } from '@reduxjs/toolkit'
+import { createSelector, createSlice, type PayloadAction } from '@reduxjs/toolkit'
 import type { RootState } from '@/shared/store'
 import { CLIENTES, BITACORA, type Cliente, type Persona, type EntradaBitacora, type Estado } from '../types/cliente.types'
 
@@ -29,6 +29,10 @@ const slice = createSlice({
     },
     reemplazarClientesDesdeApi(s, a: PayloadAction<Cliente[]>) {
       s.lista = a.payload
+    },
+    reemplazarPersonasCliente(s, a: PayloadAction<{ codigo: string; personas: Persona[] }>) {
+      const cliente = s.lista.find(c => c.codigo === a.payload.codigo)
+      if (cliente) cliente.personas = a.payload.personas
     },
     /**
      * El portal guarda al cerrar cada bloque. Si ya existe el código, actualiza
@@ -86,7 +90,7 @@ const slice = createSlice({
   },
 })
 
-export const { crearCliente, guardarBorradorPortal, reemplazarClientesDesdeApi, editarCliente, agregarPersona, quitarPersona, cambiarEstadoRegistro } = slice.actions
+export const { crearCliente, guardarBorradorPortal, reemplazarClientesDesdeApi, reemplazarPersonasCliente, editarCliente, agregarPersona, quitarPersona, cambiarEstadoRegistro } = slice.actions
 export default slice.reducer
 
 /**
@@ -97,7 +101,9 @@ export default slice.reducer
  * alguien olvide es una fuga de datos entre empresas. Sin sesión no devuelve
  * nada: fallar cerrado.
  */
-export const selectClientesDeMiEmpresa = (s: RootState) => {
-  const empresaId = s.auth.usuario?.empresaId
-  return empresaId ? s.clientes.lista.filter(c => c.empresaId === empresaId) : []
-}
+const selectEmpresaId = (s: RootState) => s.auth.usuario?.empresaId
+const CLIENTES_VACIOS: Cliente[] = []
+export const selectClientesDeMiEmpresa = createSelector(
+  [selectEmpresaId, (s: RootState) => s.clientes.lista],
+  (empresaId, lista) => empresaId ? lista.filter(c => c.empresaId === empresaId) : CLIENTES_VACIOS,
+)

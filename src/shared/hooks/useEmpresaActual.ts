@@ -18,5 +18,6 @@ export function useEmpresaActual(): Empresa | undefined {
   if (empresaId) return empresas.find(e => e.id === empresaId)
 
   const slug = window.location.pathname.split('/').filter(Boolean)[0]
-  return empresas.find(e => e.slug === slug && e.estado === 'ACTIVA')
+  const normalizar = (v: string) => v.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
+  return empresas.find(e => (e.slug ?? normalizar(e.nombre)) === slug && e.estado === 'ACTIVA')
 }

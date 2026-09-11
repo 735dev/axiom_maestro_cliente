@@ -7,7 +7,7 @@ import { store, persistor } from '@/shared/store'
 export const Providers: React.FC<{ children: React.ReactNode }> = ({ children }) => (
   <Provider store={store}>
     <PersistGate loading={null} persistor={persistor}>
-      <BrowserRouter>{children}</BrowserRouter>
+      <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>{children}</BrowserRouter>
     </PersistGate>
   </Provider>
 )

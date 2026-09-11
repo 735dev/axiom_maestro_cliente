@@ -9,7 +9,7 @@ export const Card: React.FC<{ title?: string; sub?: string; right?: React.ReactN
     </div>
   )
 
-export const Pill: React.FC<{ k: 'ok' | 'warn' | 'bad' | 'mut'; children: React.ReactNode }> = ({ k, children }) => (
+export const Pill: React.FC<{ k: 'ok' | 'warn' | 'bad' | 'mut' | 'info' | 'decision' | 'dark'; children: React.ReactNode }> = ({ k, children }) => (
   <span className={cn('pill', k)}><i className="dot" />{children}</span>
 )
 

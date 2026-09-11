@@ -21,6 +21,10 @@ type Estado = any
 const IGNORADAS = new Set<string>([
   'persist/PERSIST', 'persist/REHYDRATE', 'persist/REGISTER',
   'ui/alternarTema', 'lang/cambiarIdioma',
+  // Sincronizaciones de lectura: actualizan la proyección local desde la API,
+  // pero no son cambios hechos por una persona y no deben llenar la bitácora.
+  'clientes/reemplazarClientesDesdeApi',
+  'clientes/reemplazarPersonasCliente',
   // Marcar una notificación como leída es del que la lee, no un hecho del
   // negocio: no toca ninguna de las porciones que vigila el catch-all de más
   // abajo, así que ni falta declararla acá — queda documentado para que se
@@ -72,6 +76,18 @@ function hechoDe(tipo: string, p: any, antes: Estado, despues: Estado): Hecho | 
         detalle: `${p.cliente.razonSocial} — código ${nuevo?.codigo ?? '—'} asignado`,
         entidad: { tipo: 'cliente', id: nuevo?.codigo ?? '—', nombre: p.cliente.razonSocial },
         empresaId: p.cliente.empresaId,
+      }
+    }
+    case 'clientes/guardarBorradorPortal': {
+      const cliente = p.cliente
+      const esEnvio = cliente?.estado === 'PENDIENTE'
+      return {
+        sistema: 'Maestro',
+        accion: esEnvio ? 'Envío de expediente desde el portal' : 'Guardado de avance del portal',
+        detalle: `${cliente?.razonSocial || 'Cliente sin razón social'}${p.codigo ? ` — código ${p.codigo}` : ''}${esEnvio ? ' — enviado a Prevención' : ` — bloque ${cliente?.pasoAlcanzado ?? '—'}`}`,
+        entidad: { tipo: 'cliente', id: p.codigo ?? 'nuevo', nombre: cliente?.razonSocial },
+        empresaId: cliente?.empresaId,
+        gravedad: esEnvio ? 'sensible' : 'normal',
       }
     }
     case 'clientes/editarCliente': {

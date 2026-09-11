@@ -80,7 +80,7 @@ const conAuditoria: typeof root = (estado, accion) => {
  *       del Maestro. Se renueva también la sesión para no conservar permisos
  *       efectivos calculados con el rol anterior.
  */
-const VERSION_ESTADO = 18
+const VERSION_ESTADO = 20
 
 /**
  * Porciones cuya forma cambió. Se descartan; el resto se conserva.
@@ -99,6 +99,7 @@ const persisted = persistReducer({
   // inicial: es la forma limpia de descartar lo incompatible sin tocar el resto.
   migrate: (estado: any) => {
     if (!estado) return Promise.resolve(estado)
+    if ((estado._persist?.version ?? -1) < VERSION_ESTADO) return Promise.resolve(undefined)
     if ((estado._persist?.version ?? -1) >= VERSION_ESTADO) return Promise.resolve(estado)
     const limpio = { ...estado }
     INVALIDADAS.forEach(k => { limpio[k] = undefined })

@@ -25,8 +25,9 @@ export function App() {
   return (
     <Routes>
       <Route path="/" element={<Navigate to="/transvalor-orinoco-c-a" replace />} />
-      <Route path="/:empresaSlug" element={<PortalPublicoPage />} />
       <Route path="/acceso" element={<LoginPage />} />
+      <Route path="/login" element={<Navigate to="/acceso" replace />} />
+      <Route path="/:empresaSlug" element={<PortalPublicoPage />} />
       <Route path="/panel/*" element={<RutaProtegida><PanelShell /></RutaProtegida>} />
       {/* La puerta vieja de plataforma queda apuntando a la única que hay. */}
       <Route path="/plataforma/acceso" element={<Navigate to="/acceso" replace />} />
