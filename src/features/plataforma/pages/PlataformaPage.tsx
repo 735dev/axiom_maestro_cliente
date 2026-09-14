@@ -170,25 +170,25 @@ const NuevaEmpresa: React.FC<{ onClose: () => void }> = ({ onClose }) => {
   const empresas = useAppSelector(s => s.empresas.lista)
   const correos = useAppSelector(s => s.usuarios.usuarios.map(u => u.correo.toLowerCase()))
   const dispatch = useAppDispatch()
-  const [d, setD] = useState({ nombre: '', rif: '', dominio: '', adminNombre: '', adminCorreo: '' })
+  const [d, setD] = useState({ nombre: '', rif: '', slug: '', adminNombre: '', adminCorreo: '' })
   const [tocado, setTocado] = useState(false)
 
   const errNombre = d.nombre.trim().length < 3 ? 'Escriba al menos 3 caracteres.'
     : empresas.some(e => e.nombre.toLowerCase() === d.nombre.trim().toLowerCase()) ? 'Ya existe una empresa con ese nombre.' : null
-  const errDominio = !/^[a-z0-9.-]+\.[a-z]{2,}$/.test(d.dominio.trim())
-    ? 'Escriba un dominio válido, por ejemplo registro.empresa.com'
-    : empresas.some(e => e.dominio.toLowerCase() === d.dominio.trim().toLowerCase()) ? 'Ese dominio ya está en uso.' : null
+  const errSlug = !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(d.slug.trim())
+    ? 'Use minúsculas, números y guiones; por ejemplo transvalor-orinoco-c-a.'
+    : empresas.some(e => e.slug.toLowerCase() === d.slug.trim().toLowerCase()) ? 'Ese slug ya está en uso.' : null
   const errAdminNombre = d.adminNombre.trim().length < 5 ? 'Nombre y apellido del administrador.' : null
   const errAdminCorreo = !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(d.adminCorreo.trim())
     ? 'Escriba un correo válido.'
     : correos.includes(d.adminCorreo.trim().toLowerCase()) ? 'Ese correo ya tiene cuenta en la plataforma.' : null
 
-  const ok = !errNombre && !errDominio && !errAdminNombre && !errAdminCorreo
+  const ok = !errNombre && !errSlug && !errAdminNombre && !errAdminCorreo
 
   const crear = () => {
     if (!ok) { setTocado(true); return }
     dispatch(crearEmpresa({
-      nombre: d.nombre.trim(), rif: d.rif.trim(), dominio: d.dominio.trim().toLowerCase(),
+      nombre: d.nombre.trim(), rif: d.rif.trim(), slug: d.slug.trim().toLowerCase(),
       admin: { nombre: d.adminNombre.trim(), correo: d.adminCorreo.trim().toLowerCase() },
     }))
     onClose()
@@ -208,10 +208,10 @@ const NuevaEmpresa: React.FC<{ onClose: () => void }> = ({ onClose }) => {
           <input value={d.rif} onChange={e => setD({ ...d, rif: e.target.value.toUpperCase() })} placeholder="J-00000000-0" />
         </Field>
       </div>
-      <Field label="Dominio del portal público" error={tocado ? errDominio ?? undefined : undefined}
-        hint={!errDominio ? 'Por aquí entran sus clientes a autogestionarse.' : undefined}>
-        <input value={d.dominio} onChange={e => setD({ ...d, dominio: e.target.value.toLowerCase() })}
-          placeholder="registro.empresa.com" />
+      <Field label="Slug del portal público" error={tocado ? errSlug ?? undefined : undefined}
+        hint={!errSlug ? 'La ruta será /' + (d.slug || 'su-slug') + '.' : undefined}>
+        <input value={d.slug} onChange={e => setD({ ...d, slug: e.target.value.toLowerCase().replace(/\s+/g, '-') })}
+          placeholder="transvalor-orinoco-c-a" />
       </Field>
 
       <div className="sec">Su administrador</div>

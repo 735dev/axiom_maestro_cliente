@@ -159,7 +159,10 @@ export const EMPRESAS_INICIALES: Empresa[] = [
 export type DatosAlta = {
   nombre: string
   rif: string
-  dominio: string
+  /** Identificador público usado en la ruta /:empresaSlug. */
+  slug: string
+  /** Se conserva para compatibilidad con instalaciones que tenían dominio. */
+  dominio?: string
   admin: { nombre: string; correo: string }
 }
 
@@ -185,8 +188,8 @@ const slice = createSlice({
       prepare: (d: DatosAlta) => ({ payload: { ...d, id: 'e' + nanoid(8) } }),
       reducer: (s: State, a: PayloadAction<DatosAlta & { id: string }>) => {
         s.lista.push({
-          id: a.payload.id, slug: a.payload.nombre.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, ''), nombre: a.payload.nombre, rif: a.payload.rif,
-          dominio: a.payload.dominio, estado: 'ACTIVA', desde: HOY,
+          id: a.payload.id, slug: a.payload.slug, nombre: a.payload.nombre, rif: a.payload.rif,
+          dominio: a.payload.dominio ?? a.payload.slug, estado: 'ACTIVA', desde: HOY,
           formulario: [{
             version: 1, desde: HOY, publicadaPor: 'Axiom Core Tech',
             // Nace en blanco: la plataforma no impone secciones ni campos.
