@@ -81,7 +81,17 @@ export const FormularioDinamicoPortal: React.FC<Props> = ({ slug, formulario, re
     setGuardando(true)
     try {
       const auth = await asegurarToken()
-      const registro = await maestroApi.guardarPasoPortal(slug, auth, final ? secciones.length : paso + 1, valores)
+      const archivos = Object.entries(valores).filter(([, value]) => value instanceof File) as [string, File][]
+      const respuestas = Object.fromEntries(Object.entries(valores).filter(([, value]) => !(value instanceof File)))
+      // En el último paso el token se invalida al enviar el expediente; los
+      // archivos deben viajar antes de cerrar el borrador.
+      if (final) {
+        for (const [fieldKey, file] of archivos) await maestroApi.enviarDocumentoPortal(slug, auth, fieldKey, file)
+      }
+      const registro = await maestroApi.guardarPasoPortal(slug, auth, final ? secciones.length : paso + 1, respuestas)
+      if (!final) {
+        for (const [fieldKey, file] of archivos) await maestroApi.enviarDocumentoPortal(slug, auth, fieldKey, file)
+      }
       onGuardado?.(registro)
       if (final) onListo()
       else setPaso(p => Math.min(p + 1, secciones.length - 1))

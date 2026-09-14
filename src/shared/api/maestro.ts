@@ -69,4 +69,10 @@ export const maestroApi = {
   iniciarPortal: (slug: string, rif: string) => httpClient.post<ApiEnvelope<ApiPortalRegistro>>(`/portal/${encodeURIComponent(slug)}/borradores`, { rif }).then(r => r.data.data),
   guardarPasoPortal: (slug: string, token: string, paso: number, respuestas: Record<string, unknown>) =>
     httpClient.patch<ApiEnvelope<ApiPortalRegistro>>(`/portal/${encodeURIComponent(slug)}/borradores/${encodeURIComponent(token)}/pasos/${paso}`, { respuestas }).then(r => r.data.data),
+  enviarDocumentoPortal: (slug: string, token: string, fieldKey: string, file: File) => {
+    const body = new FormData()
+    body.append('file', file)
+    body.append('field_key', fieldKey)
+    return httpClient.post<ApiEnvelope<Record<string, unknown>>>(`/portal/${encodeURIComponent(slug)}/borradores/${encodeURIComponent(token)}/documentos`, body, { headers: { 'Content-Type': 'multipart/form-data' } }).then(r => r.data.data)
+  },
 }

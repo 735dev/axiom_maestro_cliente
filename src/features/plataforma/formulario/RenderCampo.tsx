@@ -30,7 +30,7 @@ export const RenderCampo: React.FC<{
     placeholder: campo.marcador,
     onChange: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => onChange(e.target.value),
   }
-  const v = (valor ?? '') as string
+  const v = typeof valor === 'string' ? valor : ''
 
   const etiqueta = campo.etiqueta + (campo.obligatorio ? ' *' : '')
 
@@ -68,8 +68,8 @@ export const RenderCampo: React.FC<{
         )
         : campo.tipo === 'archivo' ? (
           <div className="archivo">
-            <input type="file" disabled={soloVista} onChange={e => onChange(e.target.files?.[0]?.name ?? '')} />
-            <span>{v || 'Ningún archivo seleccionado'}</span>
+            <input type="file" disabled={soloVista} onChange={e => onChange(e.target.files?.[0] ?? null)} />
+            <span>{v || (valor instanceof File ? valor.name : 'Ningún archivo seleccionado')}</span>
           </div>
         )
         : campo.tipo === 'fecha' ? <input type="date" value={v} {...comun} />
