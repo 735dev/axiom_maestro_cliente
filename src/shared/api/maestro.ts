@@ -23,7 +23,7 @@ export type ApiCatalogoDef = { id: string; clave: string; nombre: string; descri
 export type ApiCatalogoValor = { id: string; empresa_id: string; catalogo_clave: string; valor: string; orden: number; activo: boolean }
 export type ApiRetencionBorrador = { empresa_id: string; empresa: string; dias: number }
 export type ApiRol = { id: string; codigo: string; nombre: string; descripcion?: string; es_predefinido: boolean; empresa_id?: string | null; permisos: ApiPermiso[] }
-export type ApiUsuario = { id: string; empresa_id?: string | null; ambito: string; email: string; nombre_completo: string; rol_id?: string | null; status: string; permisos_efectivos: string[] }
+export type ApiUsuario = { id: string; empresa_id?: string | null; empresa_nombre?: string | null; ambito: string; email: string; nombre_completo: string; rol_id?: string | null; status: string; permisos_efectivos: string[] }
 export type ApiFormulario = { numero_version: number; motivo: string; publicado_en: string; secciones: Array<{ id: string; nombre: string; orden: number; campos: Array<{ id: string; codigo: string; etiqueta: string; tipo_campo: string; orden: number; obligatorio: boolean; es_estandar: boolean; catalogo_ref?: string | null; ancho: string; condiciones_visibilidad?: unknown }> }> }
 export type ApiEmpresaPortal = { slug: string; nombre: string }
 export type ApiPortalRegistro = {
@@ -57,8 +57,8 @@ export const maestroApi = {
   actualizarRetencionBorradores: (empresaId: string, dias: number) => httpClient.patch<ApiEnvelope<ApiRetencionBorrador>>(`/administracion/retencion-borradores/${empresaId}`, { dias }).then(r => r.data.data),
   excepcionUsuario: (id: string, permiso_id: string, concedido: boolean, motivo: string) =>
     httpClient.post(`/administracion/usuarios/${id}/permisos`, { permiso_id, concedido, motivo }),
-  formularioVigente: () => httpClient.get<ApiEnvelope<ApiFormulario>>('/formulario/').then(r => r.data.data),
-  publicarFormulario: (payload: unknown) => httpClient.post('/formulario/versiones', payload).then(r => r.data),
+  formularioVigente: (companySlug?: string) => httpClient.get<ApiEnvelope<ApiFormulario>>('/formulario/', { params: companySlug ? { company_slug: companySlug } : undefined }).then(r => r.data.data),
+  publicarFormulario: (payload: unknown, companySlug?: string) => httpClient.post('/formulario/versiones', payload, { params: companySlug ? { company_slug: companySlug } : undefined }).then(r => r.data),
   empresaPortal: (slug: string) => httpClient.get<ApiEnvelope<ApiEmpresaPortal>>(`/portal/${encodeURIComponent(slug)}`).then(r => r.data.data),
   iniciarPortal: (slug: string, rif: string) => httpClient.post<ApiEnvelope<ApiPortalRegistro>>(`/portal/${encodeURIComponent(slug)}/borradores`, { rif }).then(r => r.data.data),
   guardarPasoPortal: (slug: string, token: string, paso: number, respuestas: Record<string, unknown>) =>

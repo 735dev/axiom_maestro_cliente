@@ -9,6 +9,7 @@ import { versionVigente } from '@/features/plataforma/store/empresasSlice'
 import { PERMISSIONS } from '@/shared/auth/permissions'
 import { catalogoDe, estandarDe } from '@/features/plataforma/formulario/tipos'
 import { maestroApi, type ApiCatalogoValor } from '@/shared/api/maestro'
+import { mostrarAviso } from '@/shared/store/slices/uiSlice'
 
 /**
  * Catálogos de la empresa.
@@ -101,7 +102,7 @@ export const MaestroCatalogos = () => {
       setCatalogosServidor(c => ({ ...c, [seleccionado]: [...(c[seleccionado] ?? []), nuevo.valor] }))
       dispatch(agregarValor({ empresaId, catalogo: seleccionado, valor: nuevo.valor }))
       setAgregando(false)
-    } catch { window.alert('No fue posible agregar el valor al catálogo.') }
+    } catch { dispatch(mostrarAviso({ tipo: 'error', texto: 'No fue posible agregar el valor al catálogo.' })) }
   }
 
   const quitarValor = async () => {
@@ -114,7 +115,7 @@ export const MaestroCatalogos = () => {
       setCatalogosServidor(c => ({ ...c, [seleccionado]: (c[seleccionado] ?? []).filter(x => x !== quitando) }))
       dispatch(quitarValorLocal({ empresaId, catalogo: seleccionado, valor: quitando }))
       setQuitando(null)
-    } catch { window.alert('No fue posible quitar el valor del catálogo.') }
+    } catch { dispatch(mostrarAviso({ tipo: 'error', texto: 'No fue posible quitar el valor del catálogo.' })) }
   }
 
   const editarValor = async () => {
@@ -131,7 +132,7 @@ export const MaestroCatalogos = () => {
       }))
       setEditando(null)
       setValor('')
-    } catch { window.alert('No fue posible editar el valor del catálogo.') }
+    } catch { dispatch(mostrarAviso({ tipo: 'error', texto: 'No fue posible editar el valor del catálogo.' })) }
   }
 
   if (!ids.length) {

@@ -167,23 +167,36 @@ const PermisosUsuario: React.FC<{ usuario: UsuarioSistema; onClose: () => void }
   const u = usuarios.find(x => x.id === usuario.id)!
   const dispatch = useAppDispatch()
   const rol = roles.find(r => r.id === u.rolId)!
+  const [solicitud, setSolicitud] = useState<{ permiso: PermissionCode; modo: 'conceder' | 'revocar' } | null>(null)
+  const [motivo, setMotivo] = useState('')
+  const [errorPermiso, setErrorPermiso] = useState<string | null>(null)
 
-  const actualizarExcepcion = async (p: PermissionCode, modo: 'conceder' | 'heredar' | 'revocar') => {
+  const actualizarExcepcion = (p: PermissionCode, modo: 'conceder' | 'heredar' | 'revocar') => {
     if (modo === 'heredar') return
-    const motivo = window.prompt(`Justificación para ${modo === 'conceder' ? 'conceder' : 'revocar'} ${p}:`)
-    if (!motivo || motivo.trim().length < 10) return
+    setSolicitud({ permiso: p, modo })
+    setMotivo('')
+    setErrorPermiso(null)
+  }
+
+  const guardarExcepcion = async () => {
+    if (!solicitud || motivo.trim().length < 10) {
+      setErrorPermiso('Escriba una justificación de al menos 10 caracteres.')
+      return
+    }
     try {
-      const permiso = (await maestroApi.permisos()).find(x => x.codigo === p)
+      const permiso = (await maestroApi.permisos()).find(x => x.codigo === solicitud.permiso)
       if (!permiso) return
-      await maestroApi.excepcionUsuario(u.id, permiso.id, modo === 'conceder', motivo)
-      dispatch(alternarExcepcion({ id: u.id, permiso: p, modo }))
-    } catch { window.alert('No fue posible guardar la excepción de permiso.') }
+      await maestroApi.excepcionUsuario(u.id, permiso.id, solicitud.modo === 'conceder', motivo.trim())
+      dispatch(alternarExcepcion({ id: u.id, permiso: solicitud.permiso, modo: solicitud.modo }))
+      setSolicitud(null)
+    } catch { setErrorPermiso('No fue posible guardar la excepción de permiso.') }
   }
 
   const modoDe = (p: PermissionCode) =>
     u.concedidos.includes(p) ? 'conceder' : u.revocados.includes(p) ? 'revocar' : 'heredar'
 
   return (
+    <>
     <Modal title={`Permisos de ${u.nombre}`} onClose={onClose}
       footer={<button className="btn pri" onClick={onClose}>Listo</button>}>
       <div className="grid" style={{ marginBottom: 4 }}>
@@ -225,6 +238,16 @@ const PermisosUsuario: React.FC<{ usuario: UsuarioSistema; onClose: () => void }
       ))}
 
     </Modal>
+    {solicitud && <Modal title={`${solicitud.modo === 'conceder' ? 'Conceder' : 'Revocar'} permiso individual`}
+      onClose={() => setSolicitud(null)}
+      footer={<><button className="btn" onClick={() => setSolicitud(null)}>Cancelar</button>
+        <button className="btn pri" onClick={() => void guardarExcepcion()}>Guardar excepción</button></>}>
+      <p className="dlg-txt">El cambio aplica solo a <b>{u.nombre}</b> y queda registrado en la auditoría.</p>
+      <Field label="Justificación" error={errorPermiso ?? undefined} hint="Mínimo 10 caracteres.">
+        <textarea autoFocus rows={4} value={motivo} onChange={e => setMotivo(e.target.value)} placeholder="Explique el motivo." />
+      </Field>
+    </Modal>}
+    </>
   )
 }
 

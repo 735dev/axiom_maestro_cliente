@@ -11,6 +11,7 @@ import { useEmpresaActual } from '@/shared/hooks/useEmpresaActual'
 import { PERMISSIONS } from '@/shared/auth/permissions'
 import { maestroApi } from '@/shared/api/maestro'
 import { reemplazarPersonasCliente } from '../store/clientesSlice'
+import { mostrarAviso } from '@/shared/store/slices/uiSlice'
 
 export const MaestroFicha: React.FC<{ codigo: string; onBack: () => void }> = ({ codigo, onBack }) => {
   const cliente = useAppSelector(s => s.clientes.lista.find(c => c.codigo === codigo))
@@ -81,7 +82,7 @@ export const MaestroFicha: React.FC<{ codigo: string; onBack: () => void }> = ({
       else await maestroApi.rechazarCliente(apiClienteId, motivo)
       dispatch(cambiarEstadoRegistro({ codigo, estado: decision, usuario: usuario!.nombre, rol: usuario!.rol, motivo }))
       setDecision(null); setMotivo('')
-    } catch { window.alert('No fue posible registrar la decisión en el servidor.') }
+    } catch { dispatch(mostrarAviso({ tipo: 'error', texto: 'No fue posible registrar la decisión en el servidor.' })) }
   }
 
   const campo = (label: string, k: keyof Cliente, opciones?: string[]) =>

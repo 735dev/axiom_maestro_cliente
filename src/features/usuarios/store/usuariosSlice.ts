@@ -28,6 +28,7 @@ export type UsuarioSistema = {
    * significa dos cosas distintas según dónde se lo mire.
    */
   empresaId: string | null
+  empresaNombre?: string
   id: string
   nombre: string
   correo: string
@@ -200,7 +201,8 @@ const slice = createSlice({
    * formulario nuevo, ni una importación, ni una prueba— que cree una empresa
    * sin nadie que pueda entrar a configurarla.
    *
-   * Queda INVITADO: existe, pero no entra hasta que use su invitación.
+   * Queda ACTIVO: el administrador inicial recibe acceso inmediato para
+   * terminar de configurar la empresa.
    */
   extraReducers: builder => {
     builder.addCase(crearEmpresa, (s, a) => {
@@ -210,7 +212,7 @@ const slice = createSlice({
         nombre: a.payload.admin.nombre,
         correo: a.payload.admin.correo,
         rolId: 'administrador',
-        estado: 'INVITADO',
+        estado: 'ACTIVO',
         concedidos: [], revocados: [],
       })
     })

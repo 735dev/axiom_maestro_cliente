@@ -100,7 +100,7 @@ export const RolesPlataforma = () => {
             </div>
             <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
               {editable && <button className="btn sm" onClick={() => setModal({ modo: 'editar' })}>Renombrar</button>}
-              <button className="btn sm" onClick={() => setModal({ modo: 'duplicar' })}>Duplicar</button>
+              <button className="btn sm" onClick={() => setModal({ modo: 'duplicar' })}>Crear plantilla basada en este rol</button>
               {editable && !rol.sistema && <button className="btn sm" onClick={() => setBorrando(true)}>Eliminar</button>}
             </div>
           </div>
@@ -211,7 +211,7 @@ const PlantillaModal: React.FC<{
   }
 
   const titulo = modo === 'editar' ? 'Renombrar plantilla'
-    : modo === 'duplicar' ? `Duplicar “${rol.nombre}” como plantilla` : 'Nueva plantilla de rol'
+    : modo === 'duplicar' ? `Crear plantilla basada en “${rol.nombre}”` : 'Nueva plantilla de rol'
 
   return (
     <Modal title={titulo} onClose={onClose}
@@ -220,8 +220,12 @@ const PlantillaModal: React.FC<{
       <p className="dlg-txt">
         {modo === 'editar'
           ? 'Cambia el nombre y la descripción. Los permisos y los usuarios asignados no se tocan.'
-          : <>Queda disponible <b>para todas las empresas</b> de la plataforma, incluidas las que se
-            den de alta después. Nadie lo tiene asignado hasta que cada empresa se lo dé a alguien.</>}
+          : modo === 'duplicar'
+            ? <>Se crea una plantilla nueva con los mismos permisos y descripción. <b>No copia usuarios</b>
+              ni cambia el rol original. Queda disponible <b>para todas las empresas</b>, pero nadie lo
+              tiene asignado hasta que una empresa lo elija.</>
+            : <>Queda disponible <b>para todas las empresas</b> de la plataforma, incluidas las que se
+              den de alta después. Nadie lo tiene asignado hasta que cada empresa se lo dé a alguien.</>}
       </p>
 
       <Field label="Nombre del rol" error={tocado ? err ?? undefined : undefined}>

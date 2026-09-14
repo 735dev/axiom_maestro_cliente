@@ -68,7 +68,7 @@ export const EditorFormulario = () => {
 
   useEffect(() => {
     let activo = true
-    maestroApi.formularioVigente().then(f => {
+    maestroApi.formularioVigente(empresa.slug).then(f => {
       if (!activo) return
       const seccionesApi = f.secciones.sort((a, b) => a.orden - b.orden).map(s => ({ id: s.id, nombre: s.nombre, sub: '' }))
       const camposApi = f.secciones.flatMap(s => s.campos.sort((a, b) => a.orden - b.orden).map(c => ({
@@ -79,7 +79,7 @@ export const EditorFormulario = () => {
       setSecciones(seccionesApi); setCampos(camposApi); setSeccion(seccionesApi[0]?.id ?? '')
     }).catch(() => { if (activo) setApiError('No fue posible cargar el formulario vigente desde el servidor.') })
     return () => { activo = false }
-  }, [])
+  }, [empresa.slug])
 
   const cambiarEmpresa = (id: string) => {
     const v = versionVigente(empresas.find(e => e.id === id)!)
@@ -360,7 +360,7 @@ export const EditorFormulario = () => {
             <button className="btn pri" disabled={motivo.trim().length < 10}
               onClick={() => {
                 const payload = { motivo, secciones: secciones.map((s, i) => ({ nombre: s.nombre, orden: i + 1, campos: campos.filter(c => c.seccion === s.id).map((c, j) => ({ codigo: c.estandar ?? c.id, etiqueta: c.etiqueta, tipo_campo: tipoApi(c.tipo), orden: j + 1, obligatorio: c.obligatorio, es_estandar: Boolean(c.estandar), catalogo_ref: c.catalogo, ancho: c.ancho ?? 'auto' })) })) }
-                maestroApi.publicarFormulario(payload).then(() => {
+                maestroApi.publicarFormulario(payload, empresa.slug).then(() => {
                   dispatch(publicarFormulario({ id: empresa.id, secciones, campos, motivo, usuario: usuario!.nombre }))
                   setPublicando(false)
                 }).catch(() => setApiError('No fue posible publicar el formulario en el servidor.'))

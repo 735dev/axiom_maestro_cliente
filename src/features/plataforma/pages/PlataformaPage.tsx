@@ -13,6 +13,7 @@ import { AuditoriaPlataforma } from './AuditoriaPlataforma'
 import { UsuariosPlataforma } from './UsuariosPlataforma'
 import { RolesPlataforma } from './RolesPlataforma'
 import { maestroApi, type ApiRetencionBorrador } from '@/shared/api/maestro'
+import { mostrarAviso } from '@/shared/store/slices/uiSlice'
 
 /**
  * Consola de la plataforma. No es una pantalla más del sistema de una empresa:
@@ -81,6 +82,7 @@ export const PlataformaPage = () => {
 }
 
 const RetencionBorradores = () => {
+  const dispatch = useAppDispatch()
   const [items, setItems] = useState<ApiRetencionBorrador[]>([])
   const [cargando, setCargando] = useState(true)
   const [guardando, setGuardando] = useState<string | null>(null)
@@ -88,16 +90,29 @@ const RetencionBorradores = () => {
   const cambiar = async (item: ApiRetencionBorrador, dias: number) => {
     setGuardando(item.empresa_id)
     try { setItems(xs => xs.map(x => x.empresa_id === item.empresa_id ? { ...x, dias } : x)); await maestroApi.actualizarRetencionBorradores(item.empresa_id, dias) }
-    catch { window.alert('No fue posible guardar la política.') }
+    catch { dispatch(mostrarAviso({ tipo: 'error', texto: 'No fue posible guardar la política.' })) }
     finally { setGuardando(null) }
   }
+  const opciones = [7, 15, 30, 60, 90, 180, 365]
   return <Listado
     titulo="Retención de borradores"
-    sub="La tarea programada inactiva los borradores sin actividad que superen este plazo. Nunca se borran físicamente."
+    sub="Define cuánto tiempo puede permanecer un registro sin actividad antes de que la tarea programada lo inactive. Nunca se borra físicamente."
     datos={items} clave={x => x.empresa_id} etiqueta="empresas"
     vacio={cargando ? 'Cargando políticas…' : 'No hay empresas configuradas.'}
     columnas={[{ th: 'Empresa' }, { th: 'Días de retención' }, { th: 'Efecto' }]}
-    fila={x => <><td><b>{x.empresa}</b></td><td><select value={x.dias} disabled={guardando === x.empresa_id} onChange={e => void cambiar(x, Number(e.target.value))}>{[7, 15, 30, 60, 90, 180, 365].map(d => <option key={d} value={d}>{d} días</option>)}</select></td><td className="td-sub">Se inactiva por tarea programada</td></>}
+    fila={x => <>
+      <td><b>{x.empresa}</b><div className="td-sub">Política propia de esta empresa</div></td>
+      <td>
+        <div className="retencion-opciones" aria-label={`Días de retención para ${x.empresa}`}>
+          {opciones.map(d => <button key={d} className={d === x.dias ? 'on' : ''}
+            disabled={guardando === x.empresa_id} onClick={() => d !== x.dias && void cambiar(x, d)}>
+            {d} días
+          </button>)}
+        </div>
+        {guardando === x.empresa_id && <div className="td-sub retencion-guardando">Guardando…</div>}
+      </td>
+      <td><span className="retencion-efecto"><i className="dot" />Se inactiva automáticamente al superar {x.dias} días sin actividad</span></td>
+    </>}
   />
 }
 
@@ -231,8 +246,8 @@ const NuevaEmpresa: React.FC<{ onClose: () => void }> = ({ onClose }) => {
       </div>
 
       <p className="dlg-txt" style={{ marginTop: 12 }}>
-        Queda con rol <b>Administrador</b> y estado <b>INVITADO</b>: existe, pero no entra hasta que
-        use su invitación. La empresa nace con el formulario en blanco.
+        Queda con rol <b>Administrador</b> y estado <b>ACTIVO</b>: puede entrar de inmediato para
+        terminar de configurar la empresa. La empresa nace con el formulario en blanco.
       </p>
     </Modal>
   )
