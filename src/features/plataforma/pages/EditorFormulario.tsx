@@ -1,7 +1,7 @@
-import React, { useEffect, useRef, useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { Pill, Modal, Field } from '@/shared/ui'
 import { useAppDispatch, useAppSelector } from '@/shared/store/hooks'
-import { publicarFormulario, versionVigente } from '../store/empresasSlice'
+import { publicarFormulario, reemplazarFormularioDesdeApi, versionVigente } from '../store/empresasSlice'
 import {
   TIPOS, CAMPOS_ESTANDAR, CATALOGOS_PLATAFORMA, catalogoDe, estandarDe, clavesUsadas,
   opcionesDe, anchoDe, camposAnteriores, operadoresPara, OPERADORES, ANCHOS, TIPOS_NUMERICOS,
@@ -20,6 +20,24 @@ const tipoDesdeApi = (tipo: string): TipoCampo => ({
 const tipoApi = (tipo: TipoCampo) => ({
   'si-no': 'si_no', multiple: 'seleccion_multiple', email: 'correo', documento: 'documento_identidad', url: 'texto',
 } as Partial<Record<TipoCampo, string>>)[tipo] ?? tipo
+
+const definicionFormulario = (secciones: Seccion[], campos: Campo[]) => ({
+  secciones: secciones.map((s, i) => ({
+    nombre: s.nombre, orden: i + 1,
+    campos: campos.filter(c => c.seccion === s.id).map((c, j) => ({
+      codigo: c.estandar ?? c.id, etiqueta: c.etiqueta, tipo_campo: tipoApi(c.tipo), orden: j + 1,
+      obligatorio: c.obligatorio, es_estandar: Boolean(c.estandar), catalogo_ref: c.catalogo,
+      opciones: c.opciones ?? [], ancho: c.ancho ?? 'auto',
+      condiciones_visibilidad: c.condicion ? {
+        enlace: c.condicion.enlace,
+        condiciones: c.condicion.condiciones.map(x => ({
+          campo_codigo: campos.find(y => y.id === x.campoId)?.estandar ?? x.campoId,
+          operador: x.operador, valor: x.valor,
+        })),
+      } : undefined,
+    })),
+  })),
+})
 
 /**
  * Editor del formulario de una empresa.
@@ -48,6 +66,7 @@ export const EditorFormulario = () => {
   const [verVersion, setVerVersion] = useState<number | null>(null)
   const mostrada = verVersion === null ? vigente : empresa.formulario.find(v => v.version === verVersion)!
   const historico = verVersion !== null
+  const urlPostulaciones = `${window.location.origin}/${empresa.slug}`
 
   /** Borrador local: nada se publica hasta que se justifique el cambio. */
   const [campos, setCampos] = useState<Campo[]>(vigente.campos)
@@ -65,11 +84,15 @@ export const EditorFormulario = () => {
   /** Valores de juguete para que la vista previa reaccione como la real. */
   const [demo, setDemo] = useState<Record<string, unknown>>({})
   const [apiError, setApiError] = useState<string | null>(null)
-  const consultadas = useRef<string | null>(null)
+  const [empresaCargada, setEmpresaCargada] = useState<string | null>(null)
+  const [borradorServidorCargado, setBorradorServidorCargado] = useState(false)
+  const [edicionUsuario, setEdicionUsuario] = useState(false)
 
   useEffect(() => {
-    if (consultadas.current === empresa.slug) return
-    consultadas.current = empresa.slug
+    if (!usuario) return
+    setEmpresaCargada(null)
+    setBorradorServidorCargado(false)
+    setEdicionUsuario(false)
     let activo = true
     const slugParaPlataforma = usuario?.ambito === 'plataforma' ? empresa.slug : undefined
     maestroApi.formularioVigente(slugParaPlataforma).then(f => {
@@ -78,12 +101,56 @@ export const EditorFormulario = () => {
       const camposApi = f.secciones.flatMap(s => s.campos.sort((a, b) => a.orden - b.orden).map(c => ({
         id: c.id, seccion: s.id, etiqueta: c.etiqueta, tipo: tipoDesdeApi(c.tipo_campo), obligatorio: c.obligatorio,
         estandar: c.es_estandar ? c.codigo : undefined, catalogo: c.catalogo_ref ?? undefined,
-        ancho: c.ancho as AnchoCampo,
+        opciones: c.opciones ?? [], ancho: c.ancho as AnchoCampo,
+        condicion: c.condiciones_visibilidad ? { enlace: c.condiciones_visibilidad.enlace, condiciones: c.condiciones_visibilidad.condiciones.map(x => ({ campoId: x.campo_codigo, operador: x.operador as any, valor: x.valor ?? undefined })) } : undefined,
       }))) as Campo[]
       setSecciones(seccionesApi); setCampos(camposApi); setSeccion(seccionesApi[0]?.id ?? '')
+      maestroApi.formularioBorrador(slugParaPlataforma).then(borrador => {
+        if (!activo) return
+        if (borrador?.formulario_version === f.numero_version && Array.isArray(borrador.secciones)) {
+          const seccionesBorrador = borrador.secciones.map((s: any, i: number) => ({ id: seccionesApi[i]?.id ?? crypto.randomUUID(), nombre: s.nombre, sub: '' }))
+          const camposBorrador = borrador.secciones.flatMap((s: any, i: number) => (s.campos ?? []).map((c: any, j: number) => ({
+            id: c.codigo, seccion: seccionesBorrador[i].id, etiqueta: c.etiqueta, tipo: tipoDesdeApi(c.tipo_campo), obligatorio: c.obligatorio,
+            estandar: c.es_estandar ? c.codigo : undefined, catalogo: c.catalogo_ref ?? undefined, opciones: c.opciones ?? [], ancho: c.ancho ?? 'auto',
+            condicion: c.condiciones_visibilidad ? { enlace: c.condiciones_visibilidad.enlace, condiciones: c.condiciones_visibilidad.condiciones.map((x: any) => ({ campoId: x.campo_codigo, operador: x.operador, valor: x.valor })) } : undefined,
+          }))) as Campo[]
+          setSecciones(seccionesBorrador); setCampos(camposBorrador); setSeccion(seccionesBorrador[0]?.id ?? '')
+        }
+      }).catch(() => undefined).finally(() => {
+        if (activo) {
+          setBorradorServidorCargado(true)
+          setEmpresaCargada(empresa.id)
+        }
+      })
+      dispatch(reemplazarFormularioDesdeApi({
+        id: empresa.id,
+        versiones: [{
+          version: f.numero_version, desde: f.publicado_en.slice(0, 10),
+          secciones: seccionesApi, campos: camposApi,
+          publicadaPor: 'Servidor', motivo: f.motivo,
+        }],
+      }))
+      return maestroApi.formularioHistorial(slugParaPlataforma).then(historialApi =>
+        Promise.all(historialApi.map(v => v.numero_version === f.numero_version
+          ? Promise.resolve(f)
+          : maestroApi.formularioVersion(v.numero_version, slugParaPlataforma)))
+      ).then(versionesApi => {
+        if (!activo) return
+        const versiones = versionesApi.map(v => {
+          const seccionesVersion = v.secciones.slice().sort((a, b) => a.orden - b.orden).map(s => ({ id: s.id, nombre: s.nombre, sub: '' }))
+          const camposVersion = v.secciones.flatMap(s => s.campos.slice().sort((a, b) => a.orden - b.orden).map(c => ({
+            id: c.id, seccion: s.id, etiqueta: c.etiqueta, tipo: tipoDesdeApi(c.tipo_campo), obligatorio: c.obligatorio,
+            estandar: c.es_estandar ? c.codigo : undefined, catalogo: c.catalogo_ref ?? undefined,
+            opciones: c.opciones ?? [], ancho: c.ancho as AnchoCampo,
+            condicion: c.condiciones_visibilidad ? { enlace: c.condiciones_visibilidad.enlace, condiciones: c.condiciones_visibilidad.condiciones.map(x => ({ campoId: x.campo_codigo, operador: x.operador as any, valor: x.valor ?? undefined })) } : undefined,
+          }))) as Campo[]
+          return { version: v.numero_version, desde: v.publicado_en.slice(0, 10), secciones: seccionesVersion, campos: camposVersion, publicadaPor: 'Servidor', motivo: v.motivo }
+        })
+        dispatch(reemplazarFormularioDesdeApi({ id: empresa.id, versiones }))
+      })
     }).catch(() => { if (activo) setApiError('No fue posible cargar el formulario vigente desde el servidor.') })
     return () => { activo = false }
-  }, [empresa.slug, usuario?.ambito])
+  }, [empresa.id, empresa.slug, usuario?.ambito, dispatch])
 
   const cambiarEmpresa = (id: string) => {
     const v = versionVigente(empresas.find(e => e.id === id)!)
@@ -103,6 +170,15 @@ export const EditorFormulario = () => {
     || JSON.stringify(secciones) !== JSON.stringify(mostrada.secciones))
   /** Diferencias del borrador contra la versión vigente. */
   const cambios = sucio ? comparar(vigente, { secciones, campos }) : []
+
+  useEffect(() => {
+    if (empresaCargada !== empresa.id || !borradorServidorCargado || !edicionUsuario || historico || !sucio) return
+    const timer = window.setTimeout(() => {
+      maestroApi.guardarFormularioBorrador({ formulario_version: vigente.version, ...definicionFormulario(secciones, campos) }, usuario?.ambito === 'plataforma' ? empresa.slug : undefined)
+        .catch(() => setApiError('El borrador quedó guardado localmente, pero no pudo sincronizarse con el servidor.'))
+    }, 350)
+    return () => window.clearTimeout(timer)
+  }, [empresaCargada, borradorServidorCargado, edicionUsuario, empresa.id, vigente.version, secciones, campos, historico, sucio, empresa.slug, usuario?.ambito])
   /**
    * Lo que se pinta sale siempre de la versión mostrada; el borrador local solo
    * existe mientras se edita la vigente. Mantener dos fuentes de verdad para lo
@@ -114,9 +190,10 @@ export const EditorFormulario = () => {
 
   const seccionActual = seccionesVista.find(b => b.id === seccion)
   const delSeccion = camposVista.filter(c => c.seccion === seccion)
-  const reemplazar = (c: Campo) => setCampos(campos.map(x => x.id === c.id ? c : x))
+  const reemplazar = (c: Campo) => { setEdicionUsuario(true); setCampos(campos.map(x => x.id === c.id ? c : x)) }
 
   const agregar = (c: Campo) => {
+    setEdicionUsuario(true)
     const ultimo = campos.map(x => x.seccion).lastIndexOf(c.seccion)
     const nuevo = [...campos]
     nuevo.splice(ultimo + 1, 0, c)
@@ -124,6 +201,7 @@ export const EditorFormulario = () => {
   }
 
   const mover = (c: Campo, dir: -1 | 1) => {
+    setEdicionUsuario(true)
     const hermanos = campos.filter(x => x.seccion === c.seccion)
     const i = hermanos.findIndex(x => x.id === c.id)
     if (i + dir < 0 || i + dir >= hermanos.length) return
@@ -134,6 +212,7 @@ export const EditorFormulario = () => {
   }
 
   const moverSeccion = (b: Seccion, dir: -1 | 1) => {
+    setEdicionUsuario(true)
     const i = secciones.findIndex(x => x.id === b.id)
     if (i + dir < 0 || i + dir >= secciones.length) return
     const nuevo = [...secciones]
@@ -163,13 +242,13 @@ export const EditorFormulario = () => {
         </div>
         <div style={{ display: 'flex', gap: 6 }}>
           {historico ? (
-            <button className="btn sm pri" onClick={() => abrirVersion(null)}>
-              Volver a la vigente (v{vigente.version})
+            <button className="btn sm pri" onClick={() => abrirVersion(null)} title={`Volver a la versión vigente v${vigente.version}`}>
+              Volver a las versiones
             </button>
           ) : (
             <>
               {sucio && <button className="btn sm"
-                onClick={() => { setCampos(vigente.campos); setSecciones(vigente.secciones) }}>Descartar</button>}
+                onClick={() => { setCampos(vigente.campos); setSecciones(vigente.secciones); maestroApi.eliminarFormularioBorrador(usuario?.ambito === 'plataforma' ? empresa.slug : undefined) }}>Descartar</button>}
               <button className="btn sm" onClick={() => setCreandoSeccion(true)}>Agregar sección</button>
               <button className="btn sm" disabled={!seccionActual} onClick={() => setCatalogo(true)}>Del catálogo</button>
               <button className="btn sm" disabled={!seccionActual} onClick={() => setCreando(true)}>Campo propio</button>
@@ -181,6 +260,13 @@ export const EditorFormulario = () => {
         </div>
       </div>
 
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', marginBottom: 12, background: '#fff', border: '1px solid var(--border)', borderRadius: 8 }}>
+        <span style={{ fontSize: 12, color: 'var(--muted)', whiteSpace: 'nowrap' }}>Link para postulaciones</span>
+        <code style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{urlPostulaciones}</code>
+        <button className="btn sm" onClick={() => navigator.clipboard?.writeText(urlPostulaciones)}>Copiar</button>
+        <a className="btn sm" href={urlPostulaciones} target="_blank" rel="noreferrer">Abrir</a>
+      </div>
+
       {historico && (
         <div className="ef-hist">
           <b>Está viendo la v{mostrada.version}, que ya no es la vigente.</b>
@@ -189,14 +275,6 @@ export const EditorFormulario = () => {
             en ese período se leen con esta definición, y por eso no se puede editar: cambiarla
             reescribiría el pasado. Publicada por {mostrada.publicadaPor} — {mostrada.motivo}
           </span>
-        </div>
-      )}
-
-      {sucio && (
-        <div className="ef-borr">
-          <b>Borrador sin publicar</b>
-          <span>{resumen(cambios)} respecto de la v{vigente.version}.</span>
-          <button className="lnk" onClick={() => setPublicando(true)}>ver el detalle y publicar</button>
         </div>
       )}
 
@@ -259,7 +337,7 @@ export const EditorFormulario = () => {
                         <button className="btn sm" disabled={i === 0} onClick={() => mover(c, -1)} title="Subir">↑</button>
                         <button className="btn sm" disabled={i === delSeccion.length - 1} onClick={() => mover(c, 1)} title="Bajar">↓</button>
                         <button className="btn sm" onClick={() => setEditando(c)}>Editar</button>
-                        <button className="btn sm" onClick={() => setCampos(campos.filter(x => x.id !== c.id))}>Quitar</button>
+                        <button className="btn sm" onClick={() => { setEdicionUsuario(true); setCampos(campos.filter(x => x.id !== c.id)) }}>Quitar</button>
                       </div>}
                     </div>
                   )
@@ -308,13 +386,20 @@ export const EditorFormulario = () => {
           usadas={clavesUsadas(campos)}
           onClose={() => setCatalogo(false)}
           onAgregar={claves => {
-            claves.forEach((k, i) => {
+            const nuevos = claves.map((k, i) => {
               const e = CAMPOS_ESTANDAR.find(x => x.clave === k)!
-              agregar({
+              return {
                 id: 'c' + Math.floor(performance.now() * 1000) + i,
                 seccion: seccionActual.id, estandar: e.clave, etiqueta: e.nombre, tipo: e.tipo,
                 obligatorio: true, catalogo: e.catalogo, marcador: e.marcador, ayuda: e.ayuda,
-              })
+              }
+            })
+            setEdicionUsuario(true)
+            setCampos(prev => {
+              const ultimo = prev.map(x => x.seccion).lastIndexOf(seccionActual.id)
+              const siguiente = [...prev]
+              siguiente.splice(ultimo + 1, 0, ...nuevos)
+              return siguiente
             })
             setCatalogo(false)
           }} />
@@ -339,6 +424,7 @@ export const EditorFormulario = () => {
           seccion={editSeccion}
           onClose={() => { setCreandoSeccion(false); setEditSeccion(null) }}
           onGuardar={b => {
+            setEdicionUsuario(true)
             if (editSeccion) setSecciones(secciones.map(x => x.id === b.id ? b : x))
             else { setSecciones([...secciones, b]); setSeccion(b.id) }
             setCreandoSeccion(false); setEditSeccion(null)
@@ -351,6 +437,7 @@ export const EditorFormulario = () => {
           campos={campos.filter(c => c.seccion === borrandoSeccion.id)}
           onClose={() => setBorrandoSeccion(null)}
           onBorrar={() => {
+            setEdicionUsuario(true)
             setSecciones(secciones.filter(x => x.id !== borrandoSeccion.id))
             setCampos(campos.filter(c => c.seccion !== borrandoSeccion.id))
             if (seccion === borrandoSeccion.id) setSeccion(secciones.find(x => x.id !== borrandoSeccion.id)?.id ?? '')
@@ -363,9 +450,10 @@ export const EditorFormulario = () => {
           footer={<><button className="btn" onClick={() => setPublicando(false)}>Cancelar</button>
             <button className="btn pri" disabled={motivo.trim().length < 10}
               onClick={() => {
-                const payload = { motivo, secciones: secciones.map((s, i) => ({ nombre: s.nombre, orden: i + 1, campos: campos.filter(c => c.seccion === s.id).map((c, j) => ({ codigo: c.estandar ?? c.id, etiqueta: c.etiqueta, tipo_campo: tipoApi(c.tipo), orden: j + 1, obligatorio: c.obligatorio, es_estandar: Boolean(c.estandar), catalogo_ref: c.catalogo, ancho: c.ancho ?? 'auto' })) })) }
+                const payload = { motivo, ...definicionFormulario(secciones, campos) }
                 maestroApi.publicarFormulario(payload, empresa.slug).then(() => {
                   dispatch(publicarFormulario({ id: empresa.id, secciones, campos, motivo, usuario: usuario!.nombre }))
+                  maestroApi.eliminarFormularioBorrador(usuario?.ambito === 'plataforma' ? empresa.slug : undefined)
                   setPublicando(false)
                 }).catch(() => setApiError('No fue posible publicar el formulario en el servidor.'))
               }}>Publicar</button></>}>

@@ -79,7 +79,9 @@ export const RenderCampo: React.FC<{
         : campo.tipo === 'moneda' ? <input inputMode="decimal" value={v} {...comun} placeholder={campo.marcador ?? '0,00'} />
         : campo.tipo === 'documento'
           ? <input value={v} {...comun} onChange={e => onChange(e.target.value.toUpperCase())} />
-        : <input type={campo.tipo === 'email' ? 'email' : campo.tipo === 'telefono' ? 'tel' : 'text'} value={v} {...comun} />}
+        : campo.tipo === 'calculado'
+          ? <input value={v} readOnly disabled />
+        : <input type={campo.tipo === 'email' ? 'email' : campo.tipo === 'telefono' ? 'tel' : campo.tipo === 'url' ? 'url' : 'text'} value={v} {...comun} />}
     </Field>
   )
 }

@@ -5,6 +5,7 @@ import { NuevoClientePage } from '@/features/clientes/pages/NuevoClientePage'
 import { RIF_RE } from '@/features/clientes/schemas/cliente.schema'
 import type { Cliente } from '@/features/clientes/types/cliente.types'
 import { maestroApi, type ApiEmpresaPortal, type ApiPortalRegistro } from '@/shared/api/maestro'
+import { FormularioDinamicoPortal } from '@/features/portal/components/FormularioDinamicoPortal'
 
 const PASOS = ['Identificación', 'Contacto', 'Estructura accionaria', 'Perfil financiero']
 
@@ -23,6 +24,7 @@ const clienteDesdePortal = (respuesta: ApiPortalRegistro, rif: string): Cliente 
     servicios: (d.servicios as string[]) ?? [], actividadDetalle: String(d.actividadDetalle ?? ''),
     redes: String(d.redes ?? ''), registroNumero: String(d.registroNumero ?? ''), registroTomo: String(d.registroTomo ?? ''),
     registroFolio: String(d.registroFolio ?? ''), capitalSuscrito: String(d.capitalSuscrito ?? ''), capitalActual: String(d.capitalActual ?? ''),
+    respuestasPortal: respuesta.respuestas ?? {},
   }
 }
 
@@ -60,9 +62,8 @@ export const PortalPublicoPage = () => {
   return (
     <div className="portal">
       <header className="portal-top">
-        <div>
-          <b>{empresa.nombre}</b>
-          <span>Registro de clientes</span>
+        <div className="portal-brand">
+          <div><b>{empresa.nombre}</b><span>Registro de clientes</span></div>
         </div>
         <div className="portal-rif">
           {retomado
@@ -81,6 +82,7 @@ export const PortalPublicoPage = () => {
             ? <Estado cliente={retomado} />
             : <div className="portal-form">
                 <div className="portal-intro">
+                  <span className="portal-kicker">FORMULARIO DIGITAL · INFORMACIÓN CONFIDENCIAL</span>
                   <h1>{retomado ? 'Continúe donde lo dejó' : 'Registro de cliente'}</h1>
                   <p>
                     {retomado
@@ -90,12 +92,16 @@ export const PortalPublicoPage = () => {
                         RIF retoma exactamente donde se quedó.</>}
                   </p>
                 </div>
-                <NuevoClientePage
-                  key={retomado?.codigo ?? 'nuevo'}
-                  borrador={retomado}
-                  onBorradorGuardado={setRetomado}
-                  onListo={() => { setEnviado(true); setRetomado(null) }}
-                />
+                {empresa.formulario
+                  ? <FormularioDinamicoPortal
+                      key={retomado?.codigo ?? 'nuevo'} slug={empresa.slug} formulario={empresa.formulario}
+                      respuestasIniciales={retomado?.respuestasPortal}
+                      rifInicial={retomado?.rif}
+                      onListo={() => { setEnviado(true); setRetomado(null) }} />
+                  : <NuevoClientePage
+                      key={retomado?.codigo ?? 'nuevo'} borrador={retomado}
+                      onBorradorGuardado={setRetomado}
+                      onListo={() => { setEnviado(true); setRetomado(null) }} />}
               </div>}
       </div>
 
@@ -120,7 +126,7 @@ const PedirRif: React.FC<{
 
   const continuar = async () => {
     const t = rif.trim().toUpperCase()
-    if (!RIF_RE.test(t)) return setError('Formato esperado: J-00000000-0.')
+    if (!RIF_RE.test(t)) return setError('Formato esperado: J-00000000-0 o J-000000000-0.')
     try {
       onRetomar(await buscar(t))
     } catch {

@@ -216,9 +216,15 @@ const slice = createSlice({
         publicadaPor: a.payload.usuario, motivo: a.payload.motivo,
       })
     },
+    reemplazarFormularioDesdeApi(s, a: PayloadAction<{ id: string; versiones: VersionFormulario[] }>) {
+      const empresa = s.lista.find(x => x.id === a.payload.id)
+      // La API entrega el historial más reciente primero; el editor y
+      // versionVigente trabajan con la vigente al final del arreglo.
+      if (empresa) empresa.formulario = [...a.payload.versiones].sort((x, y) => x.version - y.version)
+    },
   },
 })
 
-export const { crearEmpresa, cambiarEstadoEmpresa, publicarFormulario } = slice.actions
+export const { crearEmpresa, cambiarEstadoEmpresa, publicarFormulario, reemplazarFormularioDesdeApi } = slice.actions
 export default slice.reducer
 export type { Campo, Seccion }

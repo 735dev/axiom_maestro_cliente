@@ -101,7 +101,7 @@ export const MaestroClientes: React.FC<{ onOpen: (c: Cliente) => void; onNuevo: 
   )
 }
 
-const desdeApi = (c: ApiCliente): Cliente => {
+export const desdeApi = (c: ApiCliente): Cliente => {
   const r = c.respuestas_portal ?? {}
   const texto = (k: string, fallback = '') => typeof r[k] === 'string' ? r[k] as string : fallback
   const nombre = c.razon_social ?? [c.primer_nombre, c.primer_apellido].filter(Boolean).join(' ')
@@ -112,12 +112,12 @@ const desdeApi = (c: ApiCliente): Cliente => {
           : c.estado_verificacion === 'en_revision' ? 'EN REVISIÓN'
           : c.estado_verificacion.startsWith('revisado') ? 'REVISADO' : 'PENDIENTE'
   return {
-    empresaId: c.empresa_id, codigo: c.codigo, razonSocial: nombre || c.documento, rif: c.documento,
+    empresaId: c.empresa_id, codigo: c.codigo, razonSocial: nombre || 'Sin razón social', rif: c.documento,
     tipo: c.tipo_persona, registro: texto('registro'), registroNumero: texto('registroNumero'), registroTomo: texto('registroTomo'), registroFolio: texto('registroFolio'),
     capitalSuscrito: texto('capitalSuscrito'), capitalActual: texto('capitalActual'), domicilio: c.direccion ?? texto('domicilio'), telefono: c.telefono ?? texto('telefono'), correo: c.email ?? texto('correo'), web: texto('web'), redes: texto('redes'),
     sector: c.sector_economico ?? '', actividad: c.actividad_economica ?? '', origenFondos: c.origen_fondos ?? '',
     actividadDetalle: texto('actividadDetalle'), ingresos: c.ingresos_estimados ?? '', montoDeclarado: texto('montoDeclarado'), frecuencia: c.frecuencia_operacion ?? '', servicios: Array.isArray(r.servicios) ? r.servicios as string[] : [], estado,
     verificadoPor: c.revisado_por ?? undefined, fechaVerificacion: c.fecha_revision ?? undefined,
-    registradoPor: 'Servidor', fechaRegistro: c.created_at.slice(0, 10), personas: [],
+    registradoPor: 'Servidor', fechaRegistro: c.created_at.slice(0, 10), personas: [], respuestasPortal: r,
   }
 }

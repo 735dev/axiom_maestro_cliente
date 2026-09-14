@@ -13,7 +13,7 @@
 export type TipoCampo =
   | 'texto' | 'parrafo' | 'numero' | 'moneda' | 'porcentaje'
   | 'fecha' | 'email' | 'telefono' | 'documento' | 'url'
-  | 'lista' | 'multiple' | 'si-no' | 'archivo'
+  | 'lista' | 'multiple' | 'si-no' | 'archivo' | 'calculado'
 
 export const TIPOS: { id: TipoCampo; nombre: string; nota: string }[] = [
   { id: 'texto', nombre: 'Texto', nota: 'Una línea' },
@@ -30,6 +30,7 @@ export const TIPOS: { id: TipoCampo; nombre: string; nota: string }[] = [
   { id: 'multiple', nombre: 'Selección múltiple', nota: 'Varias opciones a la vez' },
   { id: 'si-no', nombre: 'Sí / No', nota: 'Interruptor' },
   { id: 'archivo', nombre: 'Archivo', nota: 'El cliente adjunta un documento' },
+  { id: 'calculado', nombre: 'Calculado', nota: 'Valor generado por el sistema' },
 ]
 
 export type SeccionId = string

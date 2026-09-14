@@ -62,6 +62,7 @@ export type Cliente = {
   /** Hasta qué bloque llegó el cliente si dejó el registro a medias. */
   pasoAlcanzado?: number
   personas: Persona[]
+  respuestasPortal?: Record<string, unknown>
 }
 
 export const CLIENTES: Cliente[] = [

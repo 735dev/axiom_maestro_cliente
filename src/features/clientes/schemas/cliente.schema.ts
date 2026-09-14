@@ -17,7 +17,8 @@ export const razonSocial = (v: string) => {
   return null
 }
 
-export const RIF_RE = /^[JGVEP]-\d{8}-\d$/
+// Algunas empresas usan RIF con 8 y otras con 9 dígitos centrales.
+export const RIF_RE = /^[JGVEP]-\d{8,9}-\d$/
 
 export const rif = (v: string, existentes: string[] = []) => {
   const t = v.trim().toUpperCase()

@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useEffect } from 'react'
 import { Card, Kpi, Pill } from '@/shared/ui'
 import { useAppSelector } from '@/shared/store/hooks'
 import { selectCatalogosDeMiEmpresa } from '@/features/catalogos/store/catalogosSlice'
@@ -13,6 +13,10 @@ import { catalogoDe } from '@/features/plataforma/formulario/tipos'
 import { EstadoPill } from '@/features/clientes/components/Pills'
 import { Barras } from '../components/Barras'
 import type { Cliente } from '@/features/clientes/types/cliente.types'
+import { maestroApi } from '@/shared/api/maestro'
+import { desdeApi } from '@/features/clientes/pages/ClientesPage'
+import { reemplazarClientesDesdeApi } from '@/features/clientes/store/clientesSlice'
+import { useAppDispatch } from '@/shared/store/hooks'
 
 /** Antigüedad real del expediente, nunca una fecha fija de demostración. */
 const dias = (desde: string) => {
@@ -43,6 +47,15 @@ export const DashboardEmpresa: React.FC<{ onAbrir: (c: Cliente) => void }> = ({ 
   const empresa = useEmpresaActual()
   const usuario = useAppSelector(s => s.auth.usuario)
   const can = useCan()
+  const dispatch = useAppDispatch()
+  const puedeVerClientes = useAppSelector(s => Boolean(s.auth.usuario?.permisos?.includes(PERMISSIONS.registrosVer)))
+
+  useEffect(() => {
+    if (!usuario || !puedeVerClientes) return
+    maestroApi.clientes({ count: 100, estado: 'todos' })
+      .then(({ data }) => dispatch(reemplazarClientesDesdeApi(data.map(desdeApi))))
+      .catch(() => undefined)
+  }, [usuario?.email, puedeVerClientes, dispatch])
 
   const verClientes = can(PERMISSIONS.registrosVer)
   const verUsuarios = can(PERMISSIONS.usuariosVer)

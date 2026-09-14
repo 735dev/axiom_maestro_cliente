@@ -24,8 +24,9 @@ export type ApiCatalogoValor = { id: string; empresa_id: string; catalogo_clave:
 export type ApiRetencionBorrador = { empresa_id: string; empresa: string; dias: number }
 export type ApiRol = { id: string; codigo: string; nombre: string; descripcion?: string; es_predefinido: boolean; empresa_id?: string | null; permisos: ApiPermiso[] }
 export type ApiUsuario = { id: string; empresa_id?: string | null; empresa_nombre?: string | null; ambito: string; email: string; nombre_completo: string; rol_id?: string | null; status: string; permisos_efectivos: string[] }
-export type ApiFormulario = { numero_version: number; motivo: string; publicado_en: string; secciones: Array<{ id: string; nombre: string; orden: number; campos: Array<{ id: string; codigo: string; etiqueta: string; tipo_campo: string; orden: number; obligatorio: boolean; es_estandar: boolean; catalogo_ref?: string | null; ancho: string; condiciones_visibilidad?: unknown }> }> }
-export type ApiEmpresaPortal = { slug: string; nombre: string }
+export type ApiCampoFormulario = { id: string; codigo: string; etiqueta: string; tipo_campo: string; orden: number; obligatorio: boolean; es_estandar: boolean; catalogo_ref?: string | null; opciones?: string[]; ancho: string; condiciones_visibilidad?: { enlace: 'y' | 'o'; condiciones: Array<{ campo_codigo: string; operador: string; valor?: string | null }> } | null }
+export type ApiFormulario = { numero_version: number; motivo: string; publicado_en: string; secciones: Array<{ id: string; nombre: string; orden: number; campos: ApiCampoFormulario[] }> }
+export type ApiEmpresaPortal = { slug: string; nombre: string; formulario?: ApiFormulario | null }
 export type ApiPortalRegistro = {
   estado: 'en_progreso' | 'enviado' | 'requiere_verificacion'
   token?: string | null; paso_actual?: number | null; respuestas?: Record<string, unknown> | null
@@ -58,6 +59,11 @@ export const maestroApi = {
   excepcionUsuario: (id: string, permiso_id: string, concedido: boolean, motivo: string) =>
     httpClient.post(`/administracion/usuarios/${id}/permisos`, { permiso_id, concedido, motivo }),
   formularioVigente: (companySlug?: string) => httpClient.get<ApiEnvelope<ApiFormulario>>('/formulario/', { params: companySlug ? { company_slug: companySlug } : undefined }).then(r => r.data.data),
+  formularioHistorial: (companySlug?: string) => httpClient.get<ApiEnvelope<Array<{ numero_version: number; motivo: string; publicado_en: string }>>>('/formulario/versiones', { params: companySlug ? { company_slug: companySlug } : undefined }).then(r => r.data.data),
+  formularioVersion: (numero: number, companySlug?: string) => httpClient.get<ApiEnvelope<ApiFormulario>>(`/formulario/versiones/${numero}`, { params: companySlug ? { company_slug: companySlug } : undefined }).then(r => r.data.data),
+  formularioBorrador: (companySlug?: string) => httpClient.get<ApiEnvelope<any>>('/formulario/borrador', { params: companySlug ? { company_slug: companySlug } : undefined }).then(r => r.data.data),
+  guardarFormularioBorrador: (payload: unknown, companySlug?: string) => httpClient.put('/formulario/borrador', payload, { params: companySlug ? { company_slug: companySlug } : undefined }).then(r => r.data),
+  eliminarFormularioBorrador: (companySlug?: string) => httpClient.delete('/formulario/borrador', { params: companySlug ? { company_slug: companySlug } : undefined }).then(r => r.data),
   publicarFormulario: (payload: unknown, companySlug?: string) => httpClient.post('/formulario/versiones', payload, { params: companySlug ? { company_slug: companySlug } : undefined }).then(r => r.data),
   empresaPortal: (slug: string) => httpClient.get<ApiEnvelope<ApiEmpresaPortal>>(`/portal/${encodeURIComponent(slug)}`).then(r => r.data.data),
   iniciarPortal: (slug: string, rif: string) => httpClient.post<ApiEnvelope<ApiPortalRegistro>>(`/portal/${encodeURIComponent(slug)}/borradores`, { rif }).then(r => r.data.data),
