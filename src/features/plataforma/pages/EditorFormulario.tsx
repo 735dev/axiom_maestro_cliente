@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { Pill, Modal, Field } from '@/shared/ui'
 import { useAppDispatch, useAppSelector } from '@/shared/store/hooks'
 import { publicarFormulario, versionVigente } from '../store/empresasSlice'
@@ -65,10 +65,14 @@ export const EditorFormulario = () => {
   /** Valores de juguete para que la vista previa reaccione como la real. */
   const [demo, setDemo] = useState<Record<string, unknown>>({})
   const [apiError, setApiError] = useState<string | null>(null)
+  const consultadas = useRef<string | null>(null)
 
   useEffect(() => {
+    if (consultadas.current === empresa.slug) return
+    consultadas.current = empresa.slug
     let activo = true
-    maestroApi.formularioVigente(empresa.slug).then(f => {
+    const slugParaPlataforma = usuario?.ambito === 'plataforma' ? empresa.slug : undefined
+    maestroApi.formularioVigente(slugParaPlataforma).then(f => {
       if (!activo) return
       const seccionesApi = f.secciones.sort((a, b) => a.orden - b.orden).map(s => ({ id: s.id, nombre: s.nombre, sub: '' }))
       const camposApi = f.secciones.flatMap(s => s.campos.sort((a, b) => a.orden - b.orden).map(c => ({
@@ -79,7 +83,7 @@ export const EditorFormulario = () => {
       setSecciones(seccionesApi); setCampos(camposApi); setSeccion(seccionesApi[0]?.id ?? '')
     }).catch(() => { if (activo) setApiError('No fue posible cargar el formulario vigente desde el servidor.') })
     return () => { activo = false }
-  }, [empresa.slug])
+  }, [empresa.slug, usuario?.ambito])
 
   const cambiarEmpresa = (id: string) => {
     const v = versionVigente(empresas.find(e => e.id === id)!)
