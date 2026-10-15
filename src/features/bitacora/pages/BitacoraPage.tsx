@@ -1,8 +1,35 @@
-import { useState, useMemo } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import { Listado, Kpi, Pill, Modal, Field, type Chip } from '@/shared/ui'
 import { useAppSelector } from '@/shared/store/hooks'
+import { useCan } from '@/shared/hooks/useCan'
+import { PERMISSIONS } from '@/shared/auth/permissions'
 import { selectAuditoriaDeMiEmpresa } from '@/shared/auditoria/selectores'
 import type { Entrada } from '@/shared/auditoria/tipos'
+import { maestroApi, type ApiBitacora } from '@/shared/api/maestro'
+
+const desdeApi = (fila: ApiBitacora): Entrada => {
+  const detalle = fila.detalle ?? {}
+  const motivo = typeof detalle.motivo === 'string' ? detalle.motivo : undefined
+  const cambios = detalle.cambios ? JSON.stringify(detalle.cambios) : ''
+  const resto = Object.entries(detalle)
+    .filter(([clave]) => clave !== 'motivo' && clave !== 'cambios')
+    .map(([clave, valor]) => `${clave}: ${typeof valor === 'string' ? valor : JSON.stringify(valor)}`)
+    .join(' · ')
+  const sensible = /decision|inactiv|permiso|veredicto|aprob|rechaz/.test(fila.accion)
+  return {
+    id: fila.id,
+    fecha: fila.ocurrido_en,
+    actor: { id: fila.actor_usuario_id ?? fila.actor_nombre, nombre: fila.actor_nombre, rol: fila.actor_rol ?? '', ambito: 'empresa' },
+    empresaId: null,
+    sistema: 'Maestro',
+    accion: fila.accion,
+    entidad: fila.entidad_tipo ? { tipo: fila.entidad_tipo, id: fila.entidad_id ?? '' } : undefined,
+    detalle: [motivo, cambios, resto].filter(Boolean).join(' · '),
+    motivo,
+    resultado: fila.resultado === 'fallido' ? 'denegado' : 'ok',
+    gravedad: sensible ? 'sensible' : 'normal',
+  }
+}
 
 const fmt = (iso: string) => iso.replace('T', ' ').replace(/[Z.].*$/, '').slice(0, 16)
 const dia = (iso: string) => iso.slice(0, 10)
@@ -20,7 +47,13 @@ const VACIO = {
  * el store no expone ninguna acción que lo permita.
  */
 export const BitacoraPage = () => {
-  const registro = useAppSelector(selectAuditoriaDeMiEmpresa)
+  const can = useCan()
+  const local = useAppSelector(selectAuditoriaDeMiEmpresa)
+  const [registro, setRegistro] = useState<Entrada[] | null>(null)
+  const fuente = registro ?? local
+  useEffect(() => {
+    maestroApi.bitacora().then(filas => setRegistro(filas.map(desdeApi))).catch(() => setRegistro([]))
+  }, [])
   const [f, setF] = useState(VACIO)
   const [detalle, setDetalle] = useState<Entrada | null>(null)
 
@@ -28,14 +61,14 @@ export const BitacoraPage = () => {
 
   // Las opciones salen del propio registro: solo se ofrece lo que existe.
   const actores = useMemo(
-    () => ['Todos', ...Array.from(new Set(registro.map(e => e.actor.nombre))).sort()], [registro])
+    () => ['Todos', ...Array.from(new Set(fuente.map(e => e.actor.nombre))).sort()], [fuente])
   const acciones = useMemo(
-    () => ['Todas', ...Array.from(new Set(registro.map(e => e.accion))).sort()], [registro])
+    () => ['Todas', ...Array.from(new Set(fuente.map(e => e.accion))).sort()], [fuente])
   const entidades = useMemo(
-    () => ['Todas', ...Array.from(new Set(registro.map(e => e.entidad?.tipo).filter(Boolean) as string[])).sort()],
-    [registro])
+    () => ['Todas', ...Array.from(new Set(fuente.map(e => e.entidad?.tipo).filter(Boolean) as string[])).sort()],
+    [fuente])
 
-  const filas = useMemo(() => registro.filter(e =>
+  const filas = useMemo(() => fuente.filter(e => (
     (f.actor === 'Todos' || e.actor.nombre === f.actor) &&
     (f.accion === 'Todas' || e.accion === f.accion) &&
     (f.gravedad === 'Todas' || e.gravedad === f.gravedad) &&
@@ -46,7 +79,7 @@ export const BitacoraPage = () => {
     (!f.conMotivo || Boolean(e.motivo)) &&
     (e.actor.nombre + e.accion + e.detalle + (e.motivo ?? '') + (e.entidad?.id ?? '') + (e.entidad?.nombre ?? ''))
       .toLowerCase().includes(f.q.toLowerCase())
-  ), [registro, f])
+  )), [fuente, f])
 
   const chips: Chip[] = [
     f.q && { texto: `“${f.q}”`, onQuitar: () => set('q', '') },
@@ -63,10 +96,10 @@ export const BitacoraPage = () => {
   return (
     <>
       <div className="kpis">
-        <Kpi label="Movimientos" value={registro.length} foot="desde el inicio del sistema" />
-        <Kpi label="Sensibles" value={registro.filter(e => e.gravedad === 'sensible').length} foot="permisos, estados y bajas" />
-        <Kpi label="Con motivo" value={registro.filter(e => e.motivo).length} foot="decisiones justificadas" />
-        <Kpi label="Actores" value={new Set(registro.map(e => e.actor.id)).size} foot="personas distintas" />
+        <Kpi label="Movimientos" value={fuente.length} foot="desde el inicio del sistema" />
+        <Kpi label="Sensibles" value={fuente.filter(e => e.gravedad === 'sensible').length} foot="permisos, estados y bajas" />
+        <Kpi label="Con motivo" value={fuente.filter(e => e.motivo).length} foot="decisiones justificadas" />
+        <Kpi label="Actores" value={new Set(fuente.map(e => e.actor.id)).size} foot="personas distintas" />
       </div>
 
       <Listado
@@ -78,6 +111,18 @@ export const BitacoraPage = () => {
         vacio="Ningún movimiento coincide con estos filtros."
         porPagina={25}
         onFila={setDetalle}
+        acciones={can(PERMISSIONS.bitacoraExportar) ? (
+          <button className="btn sm" type="button" onClick={() => {
+            maestroApi.exportarBitacora().then(blob => {
+              const url = URL.createObjectURL(blob)
+              const link = document.createElement('a')
+              link.href = url
+              link.download = 'bitacora.csv'
+              link.click()
+              URL.revokeObjectURL(url)
+            })
+          }}>Exportar</button>
+        ) : undefined}
         buscar={{ valor: f.q, onChange: v => set('q', v), marcador: 'Buscar en persona, acción, detalle o motivo', ancho: 300 }}
         chips={chips}
         onLimpiar={() => setF(VACIO)}

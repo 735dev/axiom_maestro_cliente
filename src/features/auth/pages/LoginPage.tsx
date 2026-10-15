@@ -4,6 +4,7 @@ import { useAppDispatch, useAppSelector } from '@/shared/store/hooks'
 import { login } from '@/shared/store/slices/authSlice'
 import { permisosEfectivos } from '@/features/usuarios/store/usuariosSlice'
 import { maestroApi } from '@/shared/api/maestro'
+import { MarcaPortal } from '@/shared/components/brand/IsotipoTransvalor'
 
 /**
  * Acceso único del sistema.
@@ -94,8 +95,13 @@ export const LoginPage = () => {
     <div className="login">
       <div className="login-marca">
         <div>
-          <b>Axiom</b>
-          <span>Acceso al sistema</span>
+          <div className="login-id">
+            <MarcaPortal className="login-logo" title="Axiom" />
+            <div>
+              <b>Axiom</b>
+              <span>Acceso al sistema</span>
+            </div>
+          </div>
           <p>
             Maestro de clientes y Prevención. Una sola cuenta, y el sistema lo lleva a donde le
             corresponde según su empresa.

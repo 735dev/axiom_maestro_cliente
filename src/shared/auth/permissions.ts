@@ -23,7 +23,14 @@ export const PERMISSIONS = {
   catalogosVer: 'catalogos.ver',
   catalogosGestionar: 'catalogos.gestionar',
   formularioVer: 'formulario.ver',
+  formularioGestionar: 'formulario.gestionar',
   empresaConfigurar: 'empresa.configurar',
+
+  empresasVer: 'empresas.ver',
+  empresasCrear: 'empresas.crear',
+  empresasEditar: 'empresas.editar',
+  empresasSuspender: 'empresas.suspender',
+  retencionGestionar: 'retencion.gestionar',
 
   usuariosVer: 'usuarios.ver',
   usuariosGestionar: 'usuarios.gestionar',
@@ -47,7 +54,7 @@ export type PermissionCode = (typeof PERMISSIONS)[keyof typeof PERMISSIONS]
  */
 export type Nivel = 'lectura' | 'escritura' | 'critico'
 
-export type Grupo = 'Clientes' | 'Configuración' | 'Administración' | 'Auditoría'
+export type Grupo = 'Clientes' | 'Configuración' | 'Plataforma' | 'Administración' | 'Auditoría'
 
 export type DefinicionPermiso = {
   codigo: PermissionCode
@@ -127,11 +134,41 @@ export const CATALOGO: DefinicionPermiso[] = [
   },
   {
     codigo: P.formularioVer, nombre: 'Ver el formulario de captación', grupo: 'Configuración', nivel: 'lectura',
-    descripcion: 'Consultar qué se le pide al cliente y en qué versión está. La definición la publica Axiom.',
+    descripcion: 'Consultar qué se le pide al cliente y en qué versión está.',
+  },
+  {
+    codigo: P.formularioGestionar, nombre: 'Publicar el formulario', grupo: 'Configuración', nivel: 'escritura',
+    descripcion: 'Armar y publicar la versión del formulario que usa el portal y el alta interna.',
+    implica: [P.formularioVer],
   },
   {
     codigo: P.empresaConfigurar, nombre: 'Configurar la empresa', grupo: 'Configuración', nivel: 'critico',
     descripcion: 'Cambiar los datos de la empresa, su marca y a qué correos llegan los avisos.',
+  },
+
+  /* ---------------- Plataforma ---------------- */
+  {
+    codigo: P.empresasVer, nombre: 'Ver empresas', grupo: 'Plataforma', nivel: 'lectura',
+    descripcion: 'Ver el padrón de empresas en la consola de plataforma.',
+  },
+  {
+    codigo: P.empresasCrear, nombre: 'Crear empresas', grupo: 'Plataforma', nivel: 'critico',
+    descripcion: 'Dar de alta una empresa y a su administrador.',
+    implica: [P.empresasVer],
+  },
+  {
+    codigo: P.empresasEditar, nombre: 'Editar empresas', grupo: 'Plataforma', nivel: 'escritura',
+    descripcion: 'Corregir el nombre, el RIF y el portal de una empresa.',
+    implica: [P.empresasVer],
+  },
+  {
+    codigo: P.empresasSuspender, nombre: 'Suspender empresas', grupo: 'Plataforma', nivel: 'critico',
+    descripcion: 'Suspender o reactivar una empresa. No la borra.',
+    implica: [P.empresasVer],
+  },
+  {
+    codigo: P.retencionGestionar, nombre: 'Administrar la retención', grupo: 'Plataforma', nivel: 'critico',
+    descripcion: 'Definir cuántos días se conserva un borrador abandonado de cada empresa.',
   },
 
   /* ---------------- Administración ---------------- */
@@ -171,7 +208,7 @@ export const CATALOGO: DefinicionPermiso[] = [
   },
 ]
 
-export const GRUPOS: Grupo[] = ['Clientes', 'Configuración', 'Administración', 'Auditoría']
+export const GRUPOS: Grupo[] = ['Clientes', 'Configuración', 'Plataforma', 'Administración', 'Auditoría']
 
 export const definicionDe = (c: string) => CATALOGO.find(p => p.codigo === c)
 

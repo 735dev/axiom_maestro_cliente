@@ -255,7 +255,7 @@ export const DashboardEmpresa: React.FC<{ onAbrir: (c: Cliente) => void }> = ({ 
                 <tr>
                   <td>Portal del cliente
                     <div className="td-sub">Por donde entran a autogestionarse.</div></td>
-                  <td className="td-sub" style={{ textAlign: 'right' }}>{empresa?.dominio ?? '—'}</td>
+                  <td className="td-sub" style={{ textAlign: 'right' }}>{empresa ? `/${empresa.slug}` : '—'}</td>
                 </tr>
               </tbody>
             </table>

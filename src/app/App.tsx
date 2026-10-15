@@ -1,5 +1,5 @@
 import { Routes, Route, Navigate } from 'react-router-dom'
-import { PortalPublicoPage } from '@/features/portal/pages/PortalPublicoPage'
+import { EntradaPublicaPage, PortalPublicoPage } from '@/features/portal/pages/PortalPublicoPage'
 import { LoginPage } from '@/features/auth/pages/LoginPage'
 import { PanelShell } from './PanelShell'
 import { RutaProtegida, RutaPlataforma } from './RutaProtegida'
@@ -8,7 +8,8 @@ import { PlataformaPage } from '@/features/plataforma/pages/PlataformaPage'
 /**
  * Dos zonas separadas, no dos pestañas de la misma pantalla:
  *
- *   /             público   — el cliente se autogestiona, sin cuenta
+ *   /             público   — no abre ninguna empresa
+ *   /:empresaSlug público   — el cliente se autogestiona, sin cuenta
  *   /acceso       público   — inicio de sesión, único para todo el personal
  *   /panel        protegido — el sistema interno de la empresa
  *   /plataforma   protegido — consola de Axiom, ámbito 'plataforma'
@@ -24,7 +25,7 @@ import { PlataformaPage } from '@/features/plataforma/pages/PlataformaPage'
 export function App() {
   return (
     <Routes>
-      <Route path="/" element={<Navigate to="/transvalor-orinoco-c-a" replace />} />
+      <Route path="/" element={<EntradaPublicaPage />} />
       <Route path="/acceso" element={<LoginPage />} />
       <Route path="/login" element={<Navigate to="/acceso" replace />} />
       <Route path="/:empresaSlug" element={<PortalPublicoPage />} />

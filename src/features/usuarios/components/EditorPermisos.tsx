@@ -82,17 +82,15 @@ export const EditorPermisos: React.FC<{
                       <span>
                         {d.nombre}
                         {d.nivel === 'critico' && <Pill k="bad">Crítico</Pill>}
-                        {d.nivel === 'escritura' && <Pill k="warn">Escritura</Pill>}
                       </span>
-                      <span className="td-sub">{d.descripcion}</span>
-                      {d.implica && !on && (
+                      {!soloLectura && d.implica && !on && (
                         <span className="td-sub">
-                          Se concede junto con: {d.implica.map(i => definicionDe(i)?.nombre).join(', ')}
+                          Incluye {d.implica.map(i => definicionDe(i)?.nombre).join(', ')}
                         </span>
                       )}
-                      {colgarian.length > 0 && (
-                        <span className="td-sub" style={{ color: 'var(--warn)' }}>
-                          Al quitarlo quedan sin efecto: {colgarian.map(i => definicionDe(i)?.nombre).join(', ')}
+                      {!soloLectura && colgarian.length > 0 && (
+                        <span className="td-sub">
+                          Quitar también {colgarian.map(i => definicionDe(i)?.nombre).join(', ')}
                         </span>
                       )}
                     </span>

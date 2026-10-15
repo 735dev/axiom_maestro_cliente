@@ -312,9 +312,9 @@ const Roles = () => {
                   {r.sistema && <span className="pill mut">Sistema</span>}
                 </div>
                 <div className="rp-item-m">
-                  <span className="num">{r.permisos.length}</span> de {TODOS.length} permisos
+                  <span className="num">{r.permisos.length}</span> permisos
                   <span className="rp-sep">·</span>
-                  <span className="num">{conRol(r.id)}</span> usuario{conRol(r.id) === 1 ? '' : 's'}
+                  <span className="num">{conRol(r.id)}</span>
                 </div>
               </button>
             ))}
@@ -328,7 +328,6 @@ const Roles = () => {
           <div className="rp-head">
             <div>
               <div className="rp-title">{rol.nombre}{rol.sistema && <span className="pill mut">Sistema</span>}</div>
-              <div className="rp-desc">{rol.descripcion || 'Sin descripción.'}</div>
             </div>
             <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
               <button className="btn sm" onClick={() => setModal({ modo: 'editar' })}>Renombrar</button>

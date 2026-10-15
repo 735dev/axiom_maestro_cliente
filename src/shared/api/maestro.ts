@@ -9,6 +9,7 @@ export type ApiCliente = {
   sector_economico?: string | null; actividad_economica?: string | null; origen_fondos?: string | null
   ingresos_estimados?: string | null; frecuencia_operacion?: string | null; direccion?: string | null
   email?: string | null; telefono?: string | null; estado_verificacion: string; estado_decision: string
+  nivel_riesgo?: string | null; observaciones?: string | null
   revisado_por?: string | null; fecha_revision?: string | null; created_at: string
   respuestas_portal?: Record<string, unknown> | null
 }
@@ -23,10 +24,19 @@ export type ApiCatalogoDef = { id: string; clave: string; nombre: string; descri
 export type ApiCatalogoValor = { id: string; empresa_id: string; catalogo_clave: string; valor: string; orden: number; activo: boolean }
 export type ApiRetencionBorrador = { empresa_id: string; empresa: string; dias: number }
 export type ApiRol = { id: string; codigo: string; nombre: string; descripcion?: string; es_predefinido: boolean; empresa_id?: string | null; permisos: ApiPermiso[] }
-export type ApiUsuario = { id: string; empresa_id?: string | null; empresa_nombre?: string | null; ambito: string; email: string; nombre_completo: string; rol_id?: string | null; status: string; permisos_efectivos: string[] }
+export type ApiUsuario = { id: string; empresa_id?: string | null; empresa_nombre?: string | null; ambito: string; email: string; nombre_completo: string; rol_id?: string | null; status: string; permisos_efectivos: string[]; concedidos?: string[]; revocados?: string[] }
 export type ApiCampoFormulario = { id: string; codigo: string; etiqueta: string; tipo_campo: string; orden: number; obligatorio: boolean; es_estandar: boolean; catalogo_ref?: string | null; opciones?: string[]; ancho: string; condiciones_visibilidad?: { enlace: 'y' | 'o'; condiciones: Array<{ campo_codigo: string; operador: string; valor?: string | null }> } | null }
 export type ApiFormulario = { numero_version: number; motivo: string; publicado_en: string; secciones: Array<{ id: string; nombre: string; orden: number; campos: ApiCampoFormulario[] }> }
 export type ApiEmpresaPortal = { slug: string; nombre: string; formulario?: ApiFormulario | null }
+export type ApiBitacora = {
+  id: string; actor_usuario_id?: string | null; actor_nombre: string; actor_rol?: string | null
+  accion: string; entidad_tipo?: string | null; entidad_id?: string | null
+  detalle?: Record<string, unknown> | null; resultado: string; ocurrido_en: string
+}
+export type ApiNotificacion = {
+  id: string; titulo: string; detalle: string; entidad_tipo?: string | null; entidad_id?: string | null
+  leida: boolean; created_at: string
+}
 export type ApiPortalRegistro = {
   estado: 'en_progreso' | 'enviado' | 'requiere_verificacion'
   token?: string | null; paso_actual?: number | null; respuestas?: Record<string, unknown> | null
@@ -41,6 +51,17 @@ export const maestroApi = {
   personasVinculadas: (clienteId: string) =>
     httpClient.get<ApiEnvelope<ApiPersonaVinculada[]>>(`/clientes/${clienteId}/personas-vinculadas/`).then(r => r.data.data),
   crearCliente: (payload: Record<string, unknown>) => httpClient.post<ApiEnvelope<ApiCliente>>('/clientes/', payload).then(r => r.data.data),
+  editarCliente: (id: string, payload: Record<string, unknown>) => httpClient.patch<ApiEnvelope<ApiCliente>>(`/clientes/${id}`, payload).then(r => r.data.data),
+  crearPersona: (clienteId: string, payload: Record<string, unknown>) =>
+    httpClient.post<ApiEnvelope<ApiPersonaVinculada>>(`/clientes/${clienteId}/personas-vinculadas/`, payload).then(r => r.data.data),
+  inactivarPersona: (clienteId: string, personaId: string) =>
+    httpClient.post(`/clientes/${clienteId}/personas-vinculadas/${personaId}/inactivar`, {}),
+  bitacora: () => httpClient.get<ApiEnvelope<ApiBitacora[]>>('/bitacora/').then(r => r.data.data),
+  exportarBitacora: () => httpClient.get<Blob>('/bitacora/exportar', { responseType: 'blob' }).then(r => r.data),
+  notificaciones: () => httpClient.get<ApiEnvelope<ApiNotificacion[]>>('/notificaciones/').then(r => r.data.data),
+  marcarNotificaciones: (ids: string[]) => httpClient.post('/notificaciones/leidas', { ids }),
+  confirmarPortal: (slug: string, rif: string, codigo: string) =>
+    httpClient.post<ApiEnvelope<ApiPortalRegistro>>(`/portal/${encodeURIComponent(slug)}/verificacion`, { rif, codigo }).then(r => r.data.data),
   aprobarCliente: (id: string, motivo: string) => httpClient.post(`/clientes/${id}/aprobar`, { motivo }),
   rechazarCliente: (id: string, motivo: string) => httpClient.post(`/clientes/${id}/rechazar`, { motivo }),
   inhabilitarCliente: (id: string, motivo: string) => httpClient.post(`/clientes/${id}/inhabilitar`, { motivo }),

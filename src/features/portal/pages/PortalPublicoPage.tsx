@@ -6,6 +6,7 @@ import { RIF_RE } from '@/features/clientes/schemas/cliente.schema'
 import type { Cliente } from '@/features/clientes/types/cliente.types'
 import { maestroApi, type ApiEmpresaPortal, type ApiPortalRegistro } from '@/shared/api/maestro'
 import { FormularioDinamicoPortal } from '@/features/portal/components/FormularioDinamicoPortal'
+import { MarcaPortal } from '@/shared/components/brand/IsotipoTransvalor'
 
 const PASOS = ['Identificación', 'Contacto', 'Estructura accionaria', 'Perfil financiero']
 
@@ -29,8 +30,38 @@ const clienteDesdePortal = (respuesta: ApiPortalRegistro, rif: string): Cliente 
 }
 
 /**
- * Portal público del cliente. Vive en `/`, sin sesión y sin nada del panel
- * interno: quien llega aquí ve el formulario y punto.
+ * La raíz no elige empresa. El formulario solo se abre con el enlace
+ * `/:empresaSlug` que corresponde a cada una.
+ */
+const PortalHeader: React.FC<{ nombre?: string; sub: string; children?: React.ReactNode }> = ({ nombre, sub, children }) => (
+  <header className="portal-top">
+    <div className="portal-brand">
+      <MarcaPortal className="portal-logo" />
+      <div><b>{nombre ?? 'Registro de clientes'}</b><span>{sub}</span></div>
+    </div>
+    {children}
+  </header>
+)
+
+export const EntradaPublicaPage = () => (
+  <div className="portal">
+    <PortalHeader sub="Enlace de la empresa" />
+    <div className="portal-body">
+      <div className="portal-card">
+        <span className="portal-kicker">FORMULARIO DIGITAL · INFORMACIÓN CONFIDENCIAL</span>
+        <h1>Use el enlace de su empresa</h1>
+        <p>
+          Esta dirección no abre el registro de ninguna empresa. El formulario
+          está en el enlace que le enviaron, con el nombre de la empresa en la ruta.
+        </p>
+      </div>
+    </div>
+  </div>
+)
+
+/**
+ * Portal público del cliente. Vive en `/:empresaSlug`, sin sesión y sin nada
+ * del panel interno: quien llega aquí ve el formulario y punto.
  *
  * "Continuar proceso" es el único otro camino: se pide el RIF y el sistema
  * decide qué corresponde según lo que encuentre.
@@ -42,6 +73,8 @@ export const PortalPublicoPage = () => {
   const [pidiendoRif, setPidiendoRif] = useState(false)
   /** Expediente que el cliente retomó con su RIF. */
   const [retomado, setRetomado] = useState<Cliente | null>(null)
+  const [tokenRetomado, setTokenRetomado] = useState<string | null>(null)
+  const [verificarRif, setVerificarRif] = useState<string | null>(null)
   const [enviado, setEnviado] = useState(false)
 
   useEffect(() => {
@@ -53,31 +86,45 @@ export const PortalPublicoPage = () => {
   const buscar = async (rif: string) => {
     const normalizado = rif.trim().toUpperCase()
     const respuesta = await maestroApi.iniciarPortal(empresaSlug!, normalizado)
-    return clienteDesdePortal(respuesta, normalizado)
+    if (respuesta.estado === 'requiere_verificacion') return { tipo: 'verificar' as const, rif: normalizado }
+    return {
+      tipo: 'borrador' as const,
+      cliente: clienteDesdePortal(respuesta, normalizado),
+      token: respuesta.token ?? null,
+    }
   }
 
-  if (empresaNoEncontrada) return <div className="portal"><div className="portal-body"><div className="portal-card"><h1>Empresa no encontrada</h1><p>Verifique el enlace recibido.</p></div></div></div>
-  if (!empresa) return <div className="portal"><div className="portal-body"><div className="portal-card"><p>Verificando empresa…</p></div></div></div>
+  if (empresaNoEncontrada) return (
+    <div className="portal">
+      <PortalHeader sub="Formulario digital" />
+      <div className="portal-body"><div className="portal-card"><h1>Empresa no encontrada</h1><p>Verifique el enlace recibido.</p></div></div>
+    </div>
+  )
+  if (!empresa) return (
+    <div className="portal">
+      <PortalHeader sub="Formulario digital" />
+      <div className="portal-body"><div className="portal-card"><p>Verificando empresa…</p></div></div>
+    </div>
+  )
 
   return (
     <div className="portal">
-      <header className="portal-top">
-        <div className="portal-brand">
-          <div><b>{empresa.nombre}</b><span>Registro de clientes</span></div>
-        </div>
+      <PortalHeader nombre={empresa.nombre} sub="Registro de clientes">
         <div className="portal-rif">
-          {retomado
+          {retomado || verificarRif
             ? <>
-                <span className="num">{retomado.rif}</span>
-                <button className="btn sm" onClick={() => { setRetomado(null); setEnviado(false) }}>Salir</button>
+                <span className="num">{retomado?.rif ?? verificarRif}</span>
+                <button className="btn sm" onClick={() => { setRetomado(null); setTokenRetomado(null); setVerificarRif(null); setEnviado(false) }}>Salir</button>
               </>
             : <button className="btn" onClick={() => setPidiendoRif(true)}>Continuar proceso</button>}
         </div>
-      </header>
+      </PortalHeader>
 
       <div className="portal-body">
         {enviado
           ? <Enviado onSalir={() => { setEnviado(false); setRetomado(null) }} />
+          : verificarRif
+            ? <CodigoVerificacion slug={empresa.slug} rif={verificarRif} onEstado={c => { setVerificarRif(null); setRetomado(c) }} />
           : retomado && retomado.estado !== 'BORRADOR'
             ? <Estado cliente={retomado} />
             : <div className="portal-form">
@@ -96,6 +143,7 @@ export const PortalPublicoPage = () => {
                   ? <FormularioDinamicoPortal
                       key={retomado?.codigo ?? 'nuevo'} slug={empresa.slug} formulario={empresa.formulario}
                       respuestasIniciales={retomado?.respuestasPortal}
+                      tokenInicial={tokenRetomado}
                       rifInicial={retomado?.rif}
                       onListo={() => { setEnviado(true); setRetomado(null) }} />
                   : <NuevoClientePage
@@ -109,7 +157,8 @@ export const PortalPublicoPage = () => {
         <PedirRif
           buscar={buscar}
           onClose={() => setPidiendoRif(false)}
-          onRetomar={c => { setRetomado(c); setEnviado(false); setPidiendoRif(false) }} />
+          onRetomar={c => { setRetomado(c.cliente); setTokenRetomado(c.token); setVerificarRif(null); setEnviado(false); setPidiendoRif(false) }}
+          onVerificar={rif => { setVerificarRif(rif); setRetomado(null); setTokenRetomado(null); setEnviado(false); setPidiendoRif(false) }} />
       )}
     </div>
   )
@@ -117,10 +166,11 @@ export const PortalPublicoPage = () => {
 
 /* ---------------- Continuar proceso: se pide el RIF ---------------- */
 const PedirRif: React.FC<{
-  buscar: (rif: string) => Promise<Cliente>
+  buscar: (rif: string) => Promise<{ tipo: 'borrador'; cliente: Cliente; token: string | null } | { tipo: 'verificar'; rif: string }>
   onClose: () => void
-  onRetomar: (c: Cliente) => void
-}> = ({ buscar, onClose, onRetomar }) => {
+  onRetomar: (c: { cliente: Cliente; token: string | null }) => void
+  onVerificar: (rif: string) => void
+}> = ({ buscar, onClose, onRetomar, onVerificar }) => {
   const [rif, setRif] = useState('')
   const [error, setError] = useState<string | null>(null)
 
@@ -128,7 +178,9 @@ const PedirRif: React.FC<{
     const t = rif.trim().toUpperCase()
     if (!RIF_RE.test(t)) return setError('Formato esperado: J-00000000-0 o J-000000000-0.')
     try {
-      onRetomar(await buscar(t))
+      const hallado = await buscar(t)
+      if (hallado.tipo === 'verificar') onVerificar(hallado.rif)
+      else onRetomar(hallado)
     } catch {
       setError('No fue posible abrir el registro. Verifique el RIF e intente nuevamente.')
     }
@@ -139,8 +191,8 @@ const PedirRif: React.FC<{
       footer={<><button className="btn" onClick={onClose}>Cancelar</button>
         <button className="btn pri" onClick={continuar}>Continuar</button></>}>
       <p className="dlg-txt">
-        Escriba el RIF con el que empezó. Si el registro quedó a medias, lo retoma donde lo dejó;
-        si ya lo envió, le mostramos en qué va.
+        Escriba el RIF con el que empezó. Si el registro quedó a medias, lo retoma donde lo dejó.
+        Si ya lo envió, le mandamos un código al correo declarado.
       </p>
       <Field label="RIF de la empresa" error={error ?? undefined}>
         <input autoFocus value={rif} placeholder="J-00000000-0"
@@ -148,6 +200,50 @@ const PedirRif: React.FC<{
           onKeyDown={e => e.key === 'Enter' && continuar()} />
       </Field>
     </Modal>
+  )
+}
+
+const CodigoVerificacion: React.FC<{
+  slug: string
+  rif: string
+  onEstado: (c: Cliente) => void
+}> = ({ slug, rif, onEstado }) => {
+  const [codigo, setCodigo] = useState('')
+  const [error, setError] = useState<string | null>(null)
+  const [enviando, setEnviando] = useState(false)
+
+  const confirmar = async () => {
+    setEnviando(true)
+    setError(null)
+    try {
+      const respuesta = await maestroApi.confirmarPortal(slug, rif, codigo.trim())
+      const decision = respuesta.cliente_estado_decision
+      const estado = decision === 'aprobado' ? 'APROBADO' : decision === 'rechazado' || decision === 'inhabilitado' ? 'RECHAZADO' : 'PENDIENTE'
+      onEstado({
+        ...clienteDesdePortal({ ...respuesta, estado: 'enviado' }, rif),
+        estado,
+        codigo: respuesta.cliente_codigo ?? '',
+      })
+    } catch {
+      setError('El código no es válido o ya venció.')
+    } finally {
+      setEnviando(false)
+    }
+  }
+
+  return (
+    <div className="portal-card">
+      <h1>Confirme su correo</h1>
+      <p>Enviamos un código al correo declarado en el registro <b className="num">{rif}</b>. Con ese código puede ver en qué va.</p>
+      <Field label="Código" error={error ?? undefined}>
+        <input value={codigo} inputMode="numeric" autoFocus placeholder="000000"
+          onChange={e => { setCodigo(e.target.value); setError(null) }}
+          onKeyDown={e => e.key === 'Enter' && void confirmar()} />
+      </Field>
+      <button className="btn pri" disabled={enviando || codigo.trim().length < 4} onClick={() => void confirmar()}>
+        {enviando ? 'Verificando…' : 'Ver estado'}
+      </button>
+    </div>
   )
 }
 

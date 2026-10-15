@@ -18,7 +18,7 @@ const tipoDesdeApi = (tipo: string): TipoCampo => ({
   si_no: 'si-no', seleccion_multiple: 'multiple', correo: 'email', documento_identidad: 'documento',
 }[tipo] as TipoCampo ?? tipo as TipoCampo)
 const tipoApi = (tipo: TipoCampo) => ({
-  'si-no': 'si_no', multiple: 'seleccion_multiple', email: 'correo', documento: 'documento_identidad', url: 'texto',
+  'si-no': 'si_no', multiple: 'seleccion_multiple', email: 'correo', documento: 'documento_identidad', url: 'url',
 } as Partial<Record<TipoCampo, string>>)[tipo] ?? tipo
 
 const definicionFormulario = (secciones: Seccion[], campos: Campo[]) => ({
@@ -47,7 +47,7 @@ const definicionFormulario = (secciones: Seccion[], campos: Campo[]) => ({
  * tienen columna propia en la base y por eso se pueden buscar, filtrar y
  * consumir desde los procesos del sistema.
  */
-export const EditorFormulario = () => {
+export const EditorFormulario = ({ anclado = false, editable = true }: { anclado?: boolean; editable?: boolean }) => {
   const empresas = useAppSelector(s => s.empresas.lista)
   const usuario = useAppSelector(s => s.auth.usuario)
   const dispatch = useAppDispatch()
@@ -99,7 +99,7 @@ export const EditorFormulario = () => {
       if (!activo) return
       const seccionesApi = f.secciones.sort((a, b) => a.orden - b.orden).map(s => ({ id: s.id, nombre: s.nombre, sub: '' }))
       const camposApi = f.secciones.flatMap(s => s.campos.sort((a, b) => a.orden - b.orden).map(c => ({
-        id: c.id, seccion: s.id, etiqueta: c.etiqueta, tipo: tipoDesdeApi(c.tipo_campo), obligatorio: c.obligatorio,
+        id: c.codigo, seccion: s.id, etiqueta: c.etiqueta, tipo: tipoDesdeApi(c.tipo_campo), obligatorio: c.obligatorio,
         estandar: c.es_estandar ? c.codigo : undefined, catalogo: c.catalogo_ref ?? undefined,
         opciones: c.opciones ?? [], ancho: c.ancho as AnchoCampo,
         condicion: c.condiciones_visibilidad ? { enlace: c.condiciones_visibilidad.enlace, condiciones: c.condiciones_visibilidad.condiciones.map(x => ({ campoId: x.campo_codigo, operador: x.operador as any, valor: x.valor ?? undefined })) } : undefined,
@@ -139,7 +139,7 @@ export const EditorFormulario = () => {
         const versiones = versionesApi.map(v => {
           const seccionesVersion = v.secciones.slice().sort((a, b) => a.orden - b.orden).map(s => ({ id: s.id, nombre: s.nombre, sub: '' }))
           const camposVersion = v.secciones.flatMap(s => s.campos.slice().sort((a, b) => a.orden - b.orden).map(c => ({
-            id: c.id, seccion: s.id, etiqueta: c.etiqueta, tipo: tipoDesdeApi(c.tipo_campo), obligatorio: c.obligatorio,
+            id: c.codigo, seccion: s.id, etiqueta: c.etiqueta, tipo: tipoDesdeApi(c.tipo_campo), obligatorio: c.obligatorio,
             estandar: c.es_estandar ? c.codigo : undefined, catalogo: c.catalogo_ref ?? undefined,
             opciones: c.opciones ?? [], ancho: c.ancho as AnchoCampo,
             condicion: c.condiciones_visibilidad ? { enlace: c.condiciones_visibilidad.enlace, condiciones: c.condiciones_visibilidad.condiciones.map(x => ({ campoId: x.campo_codigo, operador: x.operador as any, valor: x.valor ?? undefined })) } : undefined,
@@ -225,10 +225,12 @@ export const EditorFormulario = () => {
       <div className="ef-top">
         {apiError && <div className="val-err">{apiError}</div>}
         <div className="ef-emp">
-          <label>Empresa</label>
-          <select value={empresa.id} onChange={e => cambiarEmpresa(e.target.value)}>
-            {empresas.map(e => <option key={e.id} value={e.id}>{e.nombre}</option>)}
-          </select>
+          {!anclado && <>
+            <label>Empresa</label>
+            <select value={empresa.id} onChange={e => cambiarEmpresa(e.target.value)}>
+              {empresas.map(e => <option key={e.id} value={e.id}>{e.nombre}</option>)}
+            </select>
+          </>}
           <label className="ef-verlbl">Versión</label>
           <select value={verVersion ?? vigente.version}
             onChange={e => abrirVersion(Number(e.target.value) === vigente.version ? null : Number(e.target.value))}>
@@ -245,7 +247,7 @@ export const EditorFormulario = () => {
             <button className="btn sm pri" onClick={() => abrirVersion(null)} title={`Volver a la versión vigente v${vigente.version}`}>
               Volver a las versiones
             </button>
-          ) : (
+          ) : editable ? (
             <>
               {sucio && <button className="btn sm"
                 onClick={() => { setCampos(vigente.campos); setSecciones(vigente.secciones); maestroApi.eliminarFormularioBorrador(usuario?.ambito === 'plataforma' ? empresa.slug : undefined) }}>Descartar</button>}
@@ -256,7 +258,7 @@ export const EditorFormulario = () => {
                 Publicar v{vigente.version + 1}
               </button>
             </>
-          )}
+          ) : null}
         </div>
       </div>
 
@@ -285,7 +287,7 @@ export const EditorFormulario = () => {
             Empiece creando una sección y después agréguele campos, del
             catálogo estándar o propios de {empresa.nombre}.
           </p>
-          <button className="btn pri" onClick={() => setCreandoSeccion(true)}>Crear la primera sección</button>
+          {editable && <button className="btn pri" onClick={() => setCreandoSeccion(true)}>Crear la primera sección</button>}
         </div>
       ) : (
         <>
@@ -302,7 +304,7 @@ export const EditorFormulario = () => {
             <div className="ef-col">
               <div className="ef-h">
                 <span>Campos de la sección<span className="num"> · {delSeccion.length}</span></span>
-                {seccionActual && !historico && (
+                {seccionActual && !historico && editable && (
                   <span className="ef-seccion-a">
                     <button className="btn sm" disabled={secciones[0]?.id === seccion} onClick={() => moverSeccion(seccionActual, -1)} title="Mover la sección hacia arriba">←</button>
                     <button className="btn sm" disabled={secciones[secciones.length - 1]?.id === seccion} onClick={() => moverSeccion(seccionActual, 1)} title="Mover la sección hacia abajo">→</button>
@@ -333,7 +335,7 @@ export const EditorFormulario = () => {
                             : <><span className="rp-sep">·</span><span className="ef-sin">sin índice</span></>}
                         </div>
                       </div>
-                      {!historico && <div className="ef-campo-a">
+                      {!historico && editable && <div className="ef-campo-a">
                         <button className="btn sm" disabled={i === 0} onClick={() => mover(c, -1)} title="Subir">↑</button>
                         <button className="btn sm" disabled={i === delSeccion.length - 1} onClick={() => mover(c, 1)} title="Bajar">↓</button>
                         <button className="btn sm" onClick={() => setEditando(c)}>Editar</button>
@@ -350,7 +352,7 @@ export const EditorFormulario = () => {
             <div className="ef-col ef-prev">
               <div className="ef-h">
                 Vista previa
-                <span className="ef-h-nota">Tal como lo verá el cliente en {empresa.dominio}</span>
+                <span className="ef-h-nota">Tal como lo verá el cliente en /{empresa.slug}</span>
               </div>
               <div className="ef-prev-body">
                 <h3>{seccionActual?.nombre}</h3>
@@ -359,7 +361,7 @@ export const EditorFormulario = () => {
                   // El ancho de columnas se recalcula sobre lo que de verdad se
                   // ve: si una condición esconde campos, la sección se acomoda
                   // con lo que queda, no con lo que hay en total.
-                  const visibles = delSeccion.filter(c => campoVisible(c, demo, delSeccion))
+                  const visibles = delSeccion.filter(c => campoVisible(c, demo, camposVista))
                   const cols = columnasSeccion(visibles.map(c => anchoDe(c)))
                   return (
                     <div className={`form-grid cols-${cols}`}>
@@ -451,7 +453,7 @@ export const EditorFormulario = () => {
             <button className="btn pri" disabled={motivo.trim().length < 10}
               onClick={() => {
                 const payload = { motivo, ...definicionFormulario(secciones, campos) }
-                maestroApi.publicarFormulario(payload, empresa.slug).then(() => {
+                maestroApi.publicarFormulario(payload, usuario?.ambito === 'plataforma' ? empresa.slug : undefined).then(() => {
                   dispatch(publicarFormulario({ id: empresa.id, secciones, campos, motivo, usuario: usuario!.nombre }))
                   maestroApi.eliminarFormularioBorrador(usuario?.ambito === 'plataforma' ? empresa.slug : undefined)
                   setPublicando(false)

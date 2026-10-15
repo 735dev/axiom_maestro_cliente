@@ -225,7 +225,7 @@ function hechoDe(tipo: string, p: any, antes: Estado, despues: Estado): Hecho | 
     case 'empresas/crearEmpresa':
       return {
         sistema: 'Plataforma', accion: 'Alta de empresa con su administrador',
-        detalle: `${p.nombre} (${p.rif}) · portal ${p.dominio} · administrador ${p.admin.nombre} <${p.admin.correo}>`,
+        detalle: `${p.nombre} (${p.rif}) · portal /${p.slug} · administrador ${p.admin.nombre} <${p.admin.correo}>`,
         entidad: { tipo: 'empresa', id: p.id, nombre: p.nombre },
         empresaId: p.id, gravedad: 'sensible',
       }

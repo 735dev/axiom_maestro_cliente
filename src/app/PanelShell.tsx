@@ -8,13 +8,15 @@ import { useTheme } from '@/shared/hooks/useTheme'
 import { useEmpresaActual } from '@/shared/hooks/useEmpresaActual'
 import { MaestroClientes } from '@/features/clientes/pages/ClientesPage'
 import { MaestroFicha } from '@/features/clientes/pages/FichaPage'
-import { NuevoClientePage } from '@/features/clientes/pages/NuevoClientePage'
+import { AltaClientePage } from '@/features/clientes/pages/AltaClientePage'
+import { EditorFormulario } from '@/features/plataforma/pages/EditorFormulario'
 import { MaestroCatalogos } from '@/features/catalogos/pages/CatalogosPage'
 import { BitacoraPage } from '@/features/bitacora/pages/BitacoraPage'
 import { UsuariosPage } from '@/features/usuarios/pages/UsuariosPage'
 import { DashboardEmpresa } from '@/features/dashboard/pages/DashboardEmpresa'
 import { Campana } from '@/shared/notificaciones/Campana'
 import { maestroApi } from '@/shared/api/maestro'
+import { MarcaPortal } from '@/shared/components/brand/IsotipoTransvalor'
 import { MiPerfilPage } from '@/features/auth/pages/MiPerfilPage'
 
 const RUTAS = [
@@ -24,6 +26,7 @@ const RUTAS = [
   { id: 'inicio', label: 'Dashboard', titulo: 'Resumen', sub: 'Qué hay hoy y qué está esperando.', permiso: undefined },
   { id: 'clientes', label: 'Clientes', titulo: 'Clientes', sub: 'Registro único del grupo. Cada cliente con su código.', permiso: PERMISSIONS.registrosVer },
   { id: 'catalogos', label: 'Catálogos', titulo: 'Catálogos', sub: 'Listas desplegables administradas por el negocio.', permiso: PERMISSIONS.catalogosVer },
+  { id: 'formulario', label: 'Formulario', titulo: 'Formulario de captación', sub: 'Lo que completa el cliente en el portal y en el alta interna.', permiso: PERMISSIONS.formularioVer },
   { id: 'bitacora', label: 'Bitácora', titulo: 'Bitácora de auditoría', sub: 'Quién, cuándo y por qué. Sin edición ni borrado.', permiso: PERMISSIONS.bitacoraVer },
   { id: 'usuarios', label: 'Usuarios y roles', titulo: 'Usuarios y roles', sub: 'Identidad única para los dos sistemas.', permiso: PERMISSIONS.usuariosVer },
 ] as const satisfies readonly { id: string; label: string; titulo: string; sub: string; permiso?: PermissionCode }[]
@@ -34,7 +37,7 @@ export function PanelShell() {
   const navigate = useNavigate()
   const token = useAppSelector(s => s.auth.token)
   const usuario = useAppSelector(s => s.auth.usuario)
-  /** La marca es de la empresa de la sesión, no una constante. */
+  /** El nombre es de la empresa de la sesión. La marca es del producto. */
   const empresa = useEmpresaActual()
   const can = useCan()
   useTheme()
@@ -79,7 +82,8 @@ export function PanelShell() {
     <div className="app">
       <aside className="side">
         <div className="side-brand">
-          <b>{empresa?.nombre ?? '—'}</b><span>Maestro de clientes</span>
+          <MarcaPortal className="side-logo" title="Maestro de clientes" />
+          <div><b>{empresa?.nombre ?? '—'}</b><span>Maestro de clientes</span></div>
         </div>
         <nav className="nav">
           {visibles.map(r => (
@@ -109,11 +113,12 @@ export function PanelShell() {
         </header>
         <div className="content">
           {perfil ? <MiPerfilPage onBack={() => setPerfil(false)} />
-            : creando ? <NuevoClientePage onListo={() => setCreando(false)} onCancelar={() => setCreando(false)} />
+            : creando ? <AltaClientePage onListo={() => setCreando(false)} onCancelar={() => setCreando(false)} />
             : codigo ? <MaestroFicha codigo={codigo} onBack={() => setCodigo(null)} />
               : enVista === 'inicio' ? <DashboardEmpresa onAbrir={c => setCodigo(c.codigo)} />
                 : enVista === 'clientes' ? <MaestroClientes onOpen={c => setCodigo(c.codigo)} onNuevo={() => setCreando(true)} />
                 : enVista === 'catalogos' ? <MaestroCatalogos />
+                  : enVista === 'formulario' ? <EditorFormulario anclado editable={can(PERMISSIONS.formularioGestionar)} />
                   : enVista === 'bitacora' ? <BitacoraPage />
                     : <UsuariosPage />}
         </div>

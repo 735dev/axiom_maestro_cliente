@@ -5,9 +5,6 @@ import {
   alternarPermisoRol, fijarPermisosRol, crearRol, editarRol, borrarRol,
 } from '@/features/usuarios/store/usuariosSlice'
 import { EditorPermisos } from '@/features/usuarios/components/EditorPermisos'
-import { CATALOGO } from '@/shared/auth/permissions'
-
-const TODOS = CATALOGO.map(p => p.codigo)
 
 /**
  * Roles de la plataforma.
@@ -76,10 +73,10 @@ export const RolesPlataforma = () => {
                   </div>
                   <div className="rp-item-m">
                     {r.plataforma
-                      ? 'fuera del catálogo'
-                      : <><span className="num">{r.permisos.length}</span> de {TODOS.length} permisos</>}
+                      ? 'Sin catálogo'
+                      : <><span className="num">{r.permisos.length}</span> permisos</>}
                     <span className="rp-sep">·</span>
-                    <span className="num">{conRol(r.id).length}</span> usuario{conRol(r.id).length === 1 ? '' : 's'}
+                    <span className="num">{conRol(r.id).length}</span>
                   </div>
                 </button>
               )
@@ -96,44 +93,20 @@ export const RolesPlataforma = () => {
                 {rol.nombre}
                 <Pill k={alcance(rol).k}>{alcance(rol).t}</Pill>
               </div>
-              <div className="rp-desc">{rol.descripcion || 'Sin descripción.'}</div>
             </div>
             <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
               {editable && <button className="btn sm" onClick={() => setModal({ modo: 'editar' })}>Renombrar</button>}
-              <button className="btn sm" onClick={() => setModal({ modo: 'duplicar' })}>Crear plantilla basada en este rol</button>
+              <button className="btn sm" onClick={() => setModal({ modo: 'duplicar' })}>Duplicar</button>
               {editable && !rol.sistema && <button className="btn sm" onClick={() => setBorrando(true)}>Eliminar</button>}
             </div>
           </div>
 
-          {esAxiom && (
-            <div className="rp-tension">
-              <b>Este rol no se edita.</b>
-              <span>
-                El poder del personal de Axiom no sale del catálogo de permisos de las empresas, sino
-                del ámbito. Marcar casillas acá no cambiaría nada.
-              </span>
-            </div>
-          )}
-
-          {esDeEmpresa && (
-            <div className="rp-tension">
-              <b>Este rol es de {empresas.find(e => e.id === rol.empresaId)?.nombre}.</b>
-              <span>
-                Lo creó su administrador para su propia operación. Se puede ver y duplicar como
-                plantilla, pero editarlo desde acá sería cambiarle la configuración a un cliente sin
-                que lo pida.
-              </span>
-            </div>
-          )}
+          {!editable && <p className="rp-nota">Solo lectura.</p>}
 
           {editable && alcanzados.length > 0 && (
-            <div className="rp-alcance">
-              <b>Lo que cambie acá alcanza a {alcanzados.length} usuario(s)</b>
-              <span>
-                en {empresasAlcanzadas.size} empresa(s), de inmediato. Es una plantilla compartida:
-                quitar un permiso se lo quita a todos los que ya tienen el rol.
-              </span>
-            </div>
+            <p className="rp-nota">
+              Aplica a {alcanzados.length} usuario{alcanzados.length === 1 ? '' : 's'} en {empresasAlcanzadas.size} empresa{empresasAlcanzadas.size === 1 ? '' : 's'}.
+            </p>
           )}
 
           <EditorPermisos
@@ -141,8 +114,7 @@ export const RolesPlataforma = () => {
             soloLectura={!editable}
             onAlternar={p => dispatch(alternarPermisoRol({ rolId: rol.id, permiso: p }))}
             onGrupo={(permisos, valor) => dispatch(fijarPermisosRol({ rolId: rol.id, permisos, valor }))}
-            pie={<><b className="num">{alcanzados.length}</b> usuario{alcanzados.length === 1 ? '' : 's'} en{' '}
-              <b className="num">{empresasAlcanzadas.size}</b> empresa{empresasAlcanzadas.size === 1 ? '' : 's'}</>}
+
           />
         </div>
       </div>

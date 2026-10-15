@@ -2,9 +2,9 @@ import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Listado, Pill, Modal, Field } from '@/shared/ui'
 import { useAppDispatch, useAppSelector } from '@/shared/store/hooks'
-import { logout } from '@/shared/store/slices/authSlice'
+import { login, logout } from '@/shared/store/slices/authSlice'
 import {
-  crearEmpresa, cambiarEstadoEmpresa, versionVigente,
+  crearEmpresa, cambiarEstadoEmpresa, editarEmpresa, versionVigente,
   type Empresa,
 } from '../store/empresasSlice'
 import { EditorFormulario } from './EditorFormulario'
@@ -14,6 +14,9 @@ import { UsuariosPlataforma } from './UsuariosPlataforma'
 import { RolesPlataforma } from './RolesPlataforma'
 import { maestroApi, type ApiRetencionBorrador } from '@/shared/api/maestro'
 import { mostrarAviso } from '@/shared/store/slices/uiSlice'
+import { useCan } from '@/shared/hooks/useCan'
+import { PERMISSIONS, type PermissionCode } from '@/shared/auth/permissions'
+import { MarcaPortal } from '@/shared/components/brand/IsotipoTransvalor'
 
 /**
  * Consola de la plataforma. No es una pantalla más del sistema de una empresa:
@@ -26,29 +29,53 @@ import { mostrarAviso } from '@/shared/store/slices/uiSlice'
  */
 const RUTAS = [
   { id: 'resumen', label: 'Dashboard', titulo: 'Resumen', sub: 'Estado de la plataforma y uso del producto.' },
-  { id: 'empresas', label: 'Empresas', titulo: 'Empresas', sub: 'Altas, suspensiones y portal de cada una.' },
-  { id: 'formularios', label: 'Formularios', titulo: 'Formularios', sub: 'Qué le pide cada empresa a sus clientes.' },
-  { id: 'usuarios', label: 'Usuarios', titulo: 'Usuarios', sub: 'Todo el padrón: las empresas y también Axiom.' },
-  { id: 'roles', label: 'Roles', titulo: 'Roles', sub: 'Quién puede qué, y hasta dónde llega cada rol.' },
-  { id: 'auditoria', label: 'Auditoría', titulo: 'Auditoría', sub: 'Todo lo que pasó, en todas las empresas y en Axiom.' },
-  { id: 'retencion', label: 'Retención', titulo: 'Retención de borradores', sub: 'Cuánto tiempo se conservan los registros abandonados.' },
-] as const
+  { id: 'empresas', label: 'Empresas', titulo: 'Empresas', sub: 'Altas, suspensiones y portal de cada una.', permiso: PERMISSIONS.empresasVer },
+  { id: 'formularios', label: 'Formularios', titulo: 'Formularios', sub: 'Qué le pide cada empresa a sus clientes.', permiso: PERMISSIONS.formularioVer },
+  { id: 'usuarios', label: 'Usuarios', titulo: 'Usuarios', sub: 'Todo el padrón: las empresas y también Axiom.', permiso: PERMISSIONS.usuariosVer },
+  { id: 'roles', label: 'Roles', titulo: 'Roles', sub: 'Quién puede qué, y hasta dónde llega cada rol.', permiso: PERMISSIONS.rolesGestionar },
+  { id: 'auditoria', label: 'Auditoría', titulo: 'Auditoría', sub: 'Todo lo que pasó, en todas las empresas y en Axiom.', permiso: PERMISSIONS.bitacoraVer },
+  { id: 'retencion', label: 'Retención', titulo: 'Retención de borradores', sub: 'Cuánto tiempo se conservan los registros abandonados.', permiso: PERMISSIONS.retencionGestionar },
+] as const satisfies readonly { id: string; label: string; titulo: string; sub: string; permiso?: PermissionCode }[]
 
 export const PlataformaPage = () => {
   const dispatch = useAppDispatch()
   const navigate = useNavigate()
   const usuario = useAppSelector(s => s.auth.usuario)
+  const token = useAppSelector(s => s.auth.token)
+  const can = useCan()
   const [vista, setVista] = useState<string>('resumen')
 
-  const actual = RUTAS.find(r => r.id === vista) ?? RUTAS[0]
+  useEffect(() => {
+    if (!token || !usuario) return
+    maestroApi.sesion().then(sesion => {
+      dispatch(login({
+        token,
+        usuario: {
+          id: sesion.user_id,
+          nombre: sesion.nombre,
+          rol: sesion.rol,
+          permisos: sesion.permisos,
+          email: sesion.email,
+          ambito: sesion.scope === 'platform' ? 'plataforma' : 'empresa',
+          empresaId: sesion.empresa_id,
+        },
+      }))
+    }).catch(() => undefined)
+  }, [dispatch, token])
+
+  const visibles = RUTAS.filter(r => !r.permiso || can(r.permiso))
+  const actual = visibles.find(r => r.id === vista) ?? visibles[0]
 
   return (
     <div className="app">
       <aside className="side">
-        <div className="side-brand"><b>Axiom Core Tech</b><span>Consola de plataforma</span></div>
+        <div className="side-brand">
+          <MarcaPortal className="side-logo" title="Axiom Core Tech" />
+          <div><b>Axiom Core Tech</b><span>Consola de plataforma</span></div>
+        </div>
         <nav className="nav">
-          {RUTAS.map(r => (
-            <a key={r.id} href="#" className={vista === r.id ? 'on' : ''}
+          {visibles.map(r => (
+            <a key={r.id} href="#" className={actual.id === r.id ? 'on' : ''}
               onClick={e => { e.preventDefault(); setVista(r.id) }}>{r.label}</a>
           ))}
         </nav>
@@ -69,12 +96,12 @@ export const PlataformaPage = () => {
           </div>
         </header>
         <div className="content">
-          {vista === 'resumen' ? <DashboardPlataforma />
-            : vista === 'empresas' ? <Empresas />
-              : vista === 'formularios' ? <EditorFormulario />
-                : vista === 'usuarios' ? <UsuariosPlataforma />
-                  : vista === 'roles' ? <RolesPlataforma />
-                    : vista === 'auditoria' ? <AuditoriaPlataforma /> : <RetencionBorradores />}
+          {actual.id === 'resumen' ? <DashboardPlataforma />
+            : actual.id === 'empresas' ? <Empresas />
+              : actual.id === 'formularios' ? <EditorFormulario editable={can(PERMISSIONS.formularioGestionar)} />
+                : actual.id === 'usuarios' ? <UsuariosPlataforma />
+                  : actual.id === 'roles' ? <RolesPlataforma />
+                    : actual.id === 'auditoria' ? <AuditoriaPlataforma /> : <RetencionBorradores />}
         </div>
       </main>
     </div>
@@ -83,6 +110,7 @@ export const PlataformaPage = () => {
 
 const RetencionBorradores = () => {
   const dispatch = useAppDispatch()
+  const puede = useCan()(PERMISSIONS.retencionGestionar)
   const [items, setItems] = useState<ApiRetencionBorrador[]>([])
   const [cargando, setCargando] = useState(true)
   const [guardando, setGuardando] = useState<string | null>(null)
@@ -105,7 +133,7 @@ const RetencionBorradores = () => {
       <td>
         <div className="retencion-opciones" aria-label={`Días de retención para ${x.empresa}`}>
           {opciones.map(d => <button key={d} className={d === x.dias ? 'on' : ''}
-            disabled={guardando === x.empresa_id} onClick={() => d !== x.dias && void cambiar(x, d)}>
+            disabled={!puede || guardando === x.empresa_id} onClick={() => puede && d !== x.dias && void cambiar(x, d)}>
             {d} días
           </button>)}
         </div>
@@ -123,12 +151,14 @@ const Empresas = () => {
   const usuarios = useAppSelector(s => s.usuarios.usuarios)
   const dispatch = useAppDispatch()
   const [nueva, setNueva] = useState(false)
+  const [editar, setEditar] = useState<Empresa | null>(null)
+  const can = useCan()
   const [q, setQ] = useState('')
   const [estado, setEstado] = useState('Todas')
 
   const lista = empresas.filter(e =>
     (estado === 'Todas' || e.estado === estado) &&
-    (e.nombre + e.rif + e.dominio).toLowerCase().includes(q.trim().toLowerCase()))
+    (e.nombre + e.rif + e.slug).toLowerCase().includes(q.trim().toLowerCase()))
 
   return (
     <>
@@ -148,7 +178,7 @@ const Empresas = () => {
             { valor: 'SUSPENDIDA', texto: 'Suspendida' },
           ],
         }]}
-        acciones={<button className="btn pri sm" onClick={() => setNueva(true)}>Nueva empresa</button>}
+        acciones={can(PERMISSIONS.empresasCrear) ? <button className="btn pri sm" onClick={() => setNueva(true)}>Nueva empresa</button> : undefined}
         columnas={[
           { th: 'Empresa' }, { th: 'RIF' }, { th: 'Portal' }, { th: 'Clientes' },
           { th: 'Usuarios' }, { th: 'Formulario' }, { th: 'Estado' }, { th: '', fin: true },
@@ -160,24 +190,70 @@ const Empresas = () => {
               <div className="td-sub">Desde {e.desde}</div>
             </td>
             <td className="num">{e.rif}</td>
-            <td className="td-sub">{e.dominio}</td>
+            <td className="td-sub">/{e.slug}</td>
             <td className="num">{clientes.filter(c => c.empresaId === e.id).length}</td>
             <td className="num">{usuarios.filter(u => u.empresaId === e.id).length}</td>
             <td className="num">v{versionVigente(e).version}</td>
             <td>{e.estado === 'ACTIVA' ? <Pill k="ok">Activa</Pill> : <Pill k="bad">Suspendida</Pill>}</td>
             <td style={{ textAlign: 'right' }}>
-              <button className="btn sm" onClick={() => dispatch(cambiarEstadoEmpresa({
-                id: e.id, estado: e.estado === 'ACTIVA' ? 'SUSPENDIDA' : 'ACTIVA',
-              }))}>
-                {e.estado === 'ACTIVA' ? 'Suspender' : 'Reactivar'}
-              </button>
+              <div className="btn-row">
+                {can(PERMISSIONS.empresasEditar) && <button className="btn sm" onClick={() => setEditar(e)}>Editar</button>}
+                {can(PERMISSIONS.empresasSuspender) && <button className="btn sm" onClick={() => dispatch(cambiarEstadoEmpresa({
+                  id: e.id, estado: e.estado === 'ACTIVA' ? 'SUSPENDIDA' : 'ACTIVA',
+                }))}>
+                  {e.estado === 'ACTIVA' ? 'Suspender' : 'Reactivar'}
+                </button>}
+              </div>
             </td>
           </>
         )}
       />
 
       {nueva && <NuevaEmpresa onClose={() => setNueva(false)} />}
+      {editar && <EditarEmpresa empresa={editar} onClose={() => setEditar(null)} />}
     </>
+  )
+}
+
+const EditarEmpresa: React.FC<{ empresa: Empresa; onClose: () => void }> = ({ empresa, onClose }) => {
+  const empresas = useAppSelector(s => s.empresas.lista)
+  const dispatch = useAppDispatch()
+  const [d, setD] = useState({ nombre: empresa.nombre, rif: empresa.rif, slug: empresa.slug })
+  const [tocado, setTocado] = useState(false)
+  const otras = empresas.filter(e => e.id !== empresa.id)
+  const errNombre = d.nombre.trim().length < 3 ? 'Escriba al menos 3 caracteres.'
+    : otras.some(e => e.nombre.toLowerCase() === d.nombre.trim().toLowerCase()) ? 'Ya existe una empresa con ese nombre.' : null
+  const errSlug = !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(d.slug.trim())
+    ? 'Use minúsculas, números y guiones; por ejemplo transvalor-orinoco-c-a.'
+    : otras.some(e => e.slug.toLowerCase() === d.slug.trim().toLowerCase()) ? 'Ese portal ya está en uso.' : null
+  const ok = !errNombre && !errSlug
+  const guardar = () => {
+    if (!ok) { setTocado(true); return }
+    dispatch(editarEmpresa({
+      id: empresa.id, nombre: d.nombre.trim(), rif: d.rif.trim().toUpperCase(),
+      slug: d.slug.trim().toLowerCase(),
+    }))
+    onClose()
+  }
+  return (
+    <Modal title={`Editar empresa · ${empresa.nombre}`} onClose={onClose}
+      footer={<><button className="btn" onClick={onClose}>Cancelar</button>
+        <button className="btn pri" onClick={guardar}>Guardar</button></>}>
+      <div className="sec">La empresa</div>
+      <div className="grid">
+        <Field label="Nombre" error={tocado ? errNombre ?? undefined : undefined}>
+          <input autoFocus value={d.nombre} onChange={e => setD({ ...d, nombre: e.target.value })} />
+        </Field>
+        <Field label="RIF">
+          <input value={d.rif} onChange={e => setD({ ...d, rif: e.target.value.toUpperCase() })} placeholder="J-00000000-0" />
+        </Field>
+      </div>
+      <Field label="Portal" error={tocado ? errSlug ?? undefined : undefined}
+        hint={!errSlug ? 'La ruta será /' + (d.slug || 'su-portal') + '.' : undefined}>
+        <input value={d.slug} onChange={e => setD({ ...d, slug: e.target.value.toLowerCase().replace(/\s+/g, '-') })}
+          placeholder="transvalor-orinoco-c-a" />
+      </Field>
+    </Modal>
   )
 }
 
@@ -192,7 +268,7 @@ const NuevaEmpresa: React.FC<{ onClose: () => void }> = ({ onClose }) => {
     : empresas.some(e => e.nombre.toLowerCase() === d.nombre.trim().toLowerCase()) ? 'Ya existe una empresa con ese nombre.' : null
   const errSlug = !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(d.slug.trim())
     ? 'Use minúsculas, números y guiones; por ejemplo transvalor-orinoco-c-a.'
-    : empresas.some(e => e.slug.toLowerCase() === d.slug.trim().toLowerCase()) ? 'Ese slug ya está en uso.' : null
+    : empresas.some(e => e.slug.toLowerCase() === d.slug.trim().toLowerCase()) ? 'Ese portal ya está en uso.' : null
   const errAdminNombre = d.adminNombre.trim().length < 5 ? 'Nombre y apellido del administrador.' : null
   const errAdminCorreo = !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(d.adminCorreo.trim())
     ? 'Escriba un correo válido.'
@@ -223,8 +299,8 @@ const NuevaEmpresa: React.FC<{ onClose: () => void }> = ({ onClose }) => {
           <input value={d.rif} onChange={e => setD({ ...d, rif: e.target.value.toUpperCase() })} placeholder="J-00000000-0" />
         </Field>
       </div>
-      <Field label="Slug del portal público" error={tocado ? errSlug ?? undefined : undefined}
-        hint={!errSlug ? 'La ruta será /' + (d.slug || 'su-slug') + '.' : undefined}>
+      <Field label="Portal" error={tocado ? errSlug ?? undefined : undefined}
+        hint={!errSlug ? 'La ruta será /' + (d.slug || 'su-portal') + '.' : undefined}>
         <input value={d.slug} onChange={e => setD({ ...d, slug: e.target.value.toLowerCase().replace(/\s+/g, '-') })}
           placeholder="transvalor-orinoco-c-a" />
       </Field>
@@ -252,5 +328,3 @@ const NuevaEmpresa: React.FC<{ onClose: () => void }> = ({ onClose }) => {
     </Modal>
   )
 }
-
-export type { Empresa }

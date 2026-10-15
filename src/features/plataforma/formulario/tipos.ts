@@ -349,5 +349,8 @@ export const clavesUsadas = (campos: Campo[]) =>
  * en el campo y editable en el catálogo— y el formulario usaba la cableada, así
  * que la pantalla de catálogos no cambiaba nada de lo que veía el cliente.
  */
-export const opcionesDe = (c: Campo, catalogos: Record<string, string[]>): string[] =>
-  c.catalogo ? (catalogos[c.catalogo] ?? []) : (c.opciones ?? [])
+export const opcionesDe = (c: Campo, catalogos: Record<string, string[]>): string[] => {
+  const delCatalogo = c.catalogo ? catalogos[c.catalogo] : undefined
+  if (delCatalogo && delCatalogo.length) return delCatalogo
+  return c.opciones ?? []
+}

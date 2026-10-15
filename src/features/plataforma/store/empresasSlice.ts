@@ -26,7 +26,7 @@ export type Empresa = {
   slug: string
   nombre: string
   rif: string
-  /** Subdominio del portal público de esa empresa. */
+  /** Igual al slug. Quedó de cuando el portal se pensó como un dominio aparte. */
   dominio: string
   estado: EstadoEmpresa
   desde: string
@@ -202,6 +202,14 @@ const slice = createSlice({
       const e = s.lista.find(x => x.id === a.payload.id)
       if (e) e.estado = a.payload.estado
     },
+    editarEmpresa(s, a: PayloadAction<{ id: string; nombre: string; rif: string; slug: string }>) {
+      const e = s.lista.find(x => x.id === a.payload.id)
+      if (!e) return
+      e.nombre = a.payload.nombre
+      e.rif = a.payload.rif
+      e.slug = a.payload.slug
+      e.dominio = a.payload.slug
+    },
     /**
      * Publica una versión nueva. No edita la vigente: la deja como está y
      * agrega otra encima, para que los expedientes ya llenados sigan siendo
@@ -225,6 +233,6 @@ const slice = createSlice({
   },
 })
 
-export const { crearEmpresa, cambiarEstadoEmpresa, publicarFormulario, reemplazarFormularioDesdeApi } = slice.actions
+export const { crearEmpresa, cambiarEstadoEmpresa, editarEmpresa, publicarFormulario, reemplazarFormularioDesdeApi } = slice.actions
 export default slice.reducer
 export type { Campo, Seccion }

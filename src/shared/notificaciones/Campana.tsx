@@ -1,7 +1,10 @@
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { useAppDispatch, useAppSelector } from '@/shared/store/hooks'
 import { marcarLeidas } from './notificacionesSlice'
 import { selectNotificacionesMias } from './selectores'
+import { maestroApi } from '@/shared/api/maestro'
+import { PERMISSIONS } from '@/shared/auth/permissions'
+import type { Notificacion } from './tipos'
 
 const fmt = (iso: string) => iso.replace('T', ' ').replace(/[Z.].*$/, '').slice(0, 16)
 
@@ -13,16 +16,36 @@ const fmt = (iso: string) => iso.replace('T', ' ').replace(/[Z.].*$/, '').slice(
  */
 export const Campana: React.FC = () => {
   const dispatch = useAppDispatch()
-  const notificaciones = useAppSelector(selectNotificacionesMias)
+  const locales = useAppSelector(selectNotificacionesMias)
+  const [remotas, setRemotas] = useState<Notificacion[] | null>(null)
   const [abierta, setAbierta] = useState(false)
+  const notificaciones = remotas ?? locales
   const noLeidas = notificaciones.filter(n => !n.leida)
+
+  useEffect(() => {
+    maestroApi.notificaciones().then(filas => setRemotas(filas.map(n => ({
+      id: n.id,
+      fecha: n.created_at,
+      destinatario: { tipo: 'permiso', permiso: PERMISSIONS.registrosAprobar },
+      empresaId: null,
+      titulo: n.titulo,
+      detalle: n.detalle,
+      entidad: n.entidad_tipo && n.entidad_id ? { tipo: n.entidad_tipo, id: n.entidad_id } : undefined,
+      leida: n.leida,
+      gravedad: 'sensible',
+    })))).catch(() => setRemotas([]))
+  }, [])
 
   const alternar = () => {
     const abrir = !abierta
     setAbierta(abrir)
-    // Se marcan leídas al abrir el panel, no al montar el componente: así el
-    // contador no baja solo porque la pestaña estuvo abierta de fondo.
-    if (abrir && noLeidas.length) dispatch(marcarLeidas(noLeidas.map(n => n.id)))
+    if (abrir && noLeidas.length) {
+      dispatch(marcarLeidas(noLeidas.map(n => n.id)))
+      if (remotas) {
+        setRemotas(remotas.map(n => noLeidas.some(x => x.id === n.id) ? { ...n, leida: true } : n))
+        maestroApi.marcarNotificaciones(noLeidas.map(n => n.id)).catch(() => undefined)
+      }
+    }
   }
 
   return (

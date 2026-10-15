@@ -60,6 +60,7 @@ export const MaestroFicha: React.FC<{ codigo: string; onBack: () => void }> = ({
   const puedeEditar = can(PERMISSIONS.registrosEditar)
   const puedeAprobar = can(PERMISSIONS.registrosAprobar)
   const puedeInhabilitar = can(PERMISSIONS.registrosInactivar)
+  const veVeredicto = puedeAprobar || can(PERMISSIONS.bitacoraVer)
   const personasPag = usePaginacion(cliente.personas)
   const suma = cliente.personas.filter(p => p.rol === 'Accionista').reduce((a, p) => a + (p.porcentaje || 0), 0)
 
@@ -69,9 +70,26 @@ export const MaestroFicha: React.FC<{ codigo: string; onBack: () => void }> = ({
 
   const abrirEdicion = () => { setBorrador({}); setMotivo(''); setEditando(true) }
   const cancelar = () => { setBorrador({}); setEditando(false) }
-  const guardar = () => {
-    dispatch(editarCliente({ codigo, cambios: borrador, usuario: usuario!.nombre, rol: usuario!.rol, motivo }))
-    setEditando(false); setConfirmar(false); setBorrador({}); setMotivo('')
+  const guardar = async () => {
+    const mapa: Record<string, string> = {
+      razonSocial: 'razon_social', rif: 'documento', sector: 'sector_economico',
+      actividad: 'actividad_economica', actividadDetalle: 'actividad_economica',
+      correo: 'email', telefono: 'telefono', domicilio: 'direccion',
+      origenFondos: 'origen_fondos', ingresos: 'ingresos_estimados', frecuencia: 'frecuencia_operacion',
+    }
+    const payload: Record<string, unknown> = { motivo }
+    for (const [clave, valor] of Object.entries(borrador)) {
+      const destino = mapa[clave]
+      if (destino) payload[destino] = valor
+    }
+    try {
+      if (!apiClienteId) throw new Error('Cliente no encontrado en el servidor')
+      await maestroApi.editarCliente(apiClienteId, payload)
+      dispatch(editarCliente({ codigo, cambios: borrador, usuario: usuario!.nombre, rol: usuario!.rol, motivo }))
+      setEditando(false); setConfirmar(false); setBorrador({}); setMotivo('')
+    } catch {
+      dispatch(mostrarAviso({ tipo: 'error', texto: 'No fue posible guardar la ficha en el servidor.' }))
+    }
   }
 
   const decidir = async () => {
@@ -212,8 +230,10 @@ export const MaestroFicha: React.FC<{ codigo: string; onBack: () => void }> = ({
               <div className="grid">
                 <Field label="Registrado por" value={cliente.registradoPor} />
                 <Field label="Fecha de registro" value={cliente.fechaRegistro} mono />
-                <Field label="Verificado por" value={cliente.verificadoPor} />
-                <Field label="Fecha de verificación" value={cliente.fechaVerificacion} mono />
+                {veVeredicto && <>
+                  <Field label="Verificado por" value={cliente.verificadoPor} />
+                  <Field label="Fecha de verificación" value={cliente.fechaVerificacion} mono />
+                </>}
               </div>
             </>
           )}
@@ -240,8 +260,11 @@ export const MaestroFicha: React.FC<{ codigo: string; onBack: () => void }> = ({
           footer={<><button className="btn" onClick={() => setInhabilitar(false)}>Cancelar</button>
             <button className="btn pri" disabled={motivo.trim().length < 10}
               onClick={() => {
-                dispatch(cambiarEstadoRegistro({ codigo, estado: 'INHABILITADO', usuario: usuario!.nombre, rol: usuario!.rol, motivo }))
-                setInhabilitar(false); setMotivo('')
+                if (!apiClienteId) return
+                maestroApi.inhabilitarCliente(apiClienteId, motivo).then(() => {
+                  dispatch(cambiarEstadoRegistro({ codigo, estado: 'INHABILITADO', usuario: usuario!.nombre, rol: usuario!.rol, motivo }))
+                  setInhabilitar(false); setMotivo('')
+                }).catch(() => dispatch(mostrarAviso({ tipo: 'error', texto: 'No fue posible inhabilitar el cliente.' })))
               }}>Inhabilitar</button></>}>
           <p className="dlg-txt">
             El cliente <b>no se borra</b>: queda inhabilitado y conserva toda su historia.
@@ -276,8 +299,11 @@ export const MaestroFicha: React.FC<{ codigo: string; onBack: () => void }> = ({
           footer={<><button className="btn" onClick={() => setQuitar(null)}>Cancelar</button>
             <button className="btn pri" disabled={motivo.trim().length < 10}
               onClick={() => {
-                dispatch(quitarPersona({ codigo, personaId: quitar.id, usuario: usuario!.nombre, rol: usuario!.rol, motivo }))
-                setQuitar(null); setMotivo('')
+                if (!apiClienteId) return
+                maestroApi.inactivarPersona(apiClienteId, quitar.id).then(() => {
+                  dispatch(quitarPersona({ codigo, personaId: quitar.id, usuario: usuario!.nombre, rol: usuario!.rol, motivo }))
+                  setQuitar(null); setMotivo('')
+                }).catch(() => dispatch(mostrarAviso({ tipo: 'error', texto: 'No fue posible quitar la persona.' })))
               }}>Quitar</button></>}>
           <p style={{ fontSize: 13, marginBottom: 12 }}><b>{quitar.nombre}</b> — {quitar.rol}</p>
           <Field label="Motivo (obligatorio)">
@@ -287,13 +313,13 @@ export const MaestroFicha: React.FC<{ codigo: string; onBack: () => void }> = ({
         </Modal>
       )}
 
-      {nueva && <NuevaPersona codigo={codigo} onClose={() => setNueva(false)} />}
+      {nueva && apiClienteId && <NuevaPersona codigo={codigo} clienteId={apiClienteId} onClose={() => setNueva(false)} />}
     </>
   )
 }
 
 /* ---------------- Alta de persona ---------------- */
-const NuevaPersona: React.FC<{ codigo: string; onClose: () => void }> = ({ codigo, onClose }) => {
+const NuevaPersona: React.FC<{ codigo: string; clienteId: string; onClose: () => void }> = ({ codigo, clienteId, onClose }) => {
   const dispatch = useAppDispatch()
   const usuario = useAppSelector(s => s.auth.usuario)
   const [d, setD] = useState({
@@ -307,18 +333,33 @@ const NuevaPersona: React.FC<{ codigo: string; onClose: () => void }> = ({ codig
     <Modal title="Agregar persona vinculada" onClose={onClose}
       footer={<><button className="btn" onClick={onClose}>Cancelar</button>
         <button className="btn pri" disabled={!ok} onClick={() => {
-          dispatch(agregarPersona({
-            codigo,
-            persona: {
-              id: 'p' + Date.now(), nombre: d.nombre, documento: d.documento, rol: d.rol,
-              nacionalidad: d.nacionalidad,
-              porcentaje: d.rol === 'Accionista' && d.porcentaje ? Number(d.porcentaje) : undefined,
-              cargo: d.rol === 'Representante legal' ? d.cargo : undefined,
-              pep: d.pep, pepCargo: d.pep ? d.pepCargo : undefined, pepDesde: d.pep ? d.pepDesde : undefined,
-            },
-            usuario: usuario!.nombre, rol: usuario!.rol,
-          }))
-          onClose()
+          const partes = d.nombre.trim().split(/\s+/).filter(Boolean)
+          const rolApi = { Accionista: 'accionista', 'Beneficiario final': 'beneficiario_final', 'Representante legal': 'representante_legal' }[d.rol]
+          const nacionalidad = { Venezolana: 'VEN', Portuguesa: 'PRT', Española: 'ESP', Rusa: 'RUS' }[d.nacionalidad]
+          maestroApi.crearPersona(clienteId, {
+            rol_vinculo: rolApi,
+            primer_nombre: partes[0],
+            primer_apellido: partes[1] ?? 'Sin apellido',
+            segundo_nombre: partes[2],
+            documento: d.documento,
+            nacionalidad,
+            cargo: d.rol === 'Representante legal' ? d.cargo : undefined,
+            porcentaje_participacion: d.rol === 'Accionista' && d.porcentaje ? Number(d.porcentaje) : undefined,
+            es_pep: d.pep,
+          }).then(p => {
+            dispatch(agregarPersona({
+              codigo,
+              persona: {
+                id: p.id, nombre: d.nombre, documento: d.documento, rol: d.rol,
+                nacionalidad: d.nacionalidad,
+                porcentaje: d.rol === 'Accionista' && d.porcentaje ? Number(d.porcentaje) : undefined,
+                cargo: d.rol === 'Representante legal' ? d.cargo : undefined,
+                pep: d.pep, pepCargo: d.pep ? d.pepCargo : undefined, pepDesde: d.pep ? d.pepDesde : undefined,
+              },
+              usuario: usuario!.nombre, rol: usuario!.rol,
+            }))
+            onClose()
+          }).catch(() => dispatch(mostrarAviso({ tipo: 'error', texto: 'No fue posible guardar la persona.' })))
         }}>Guardar</button></>}>
       <div className="grid">
         <Field label="Nombre completo"><input value={d.nombre} onChange={e => setD({ ...d, nombre: e.target.value })} placeholder="Nombres y apellidos" /></Field>

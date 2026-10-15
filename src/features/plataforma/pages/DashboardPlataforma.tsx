@@ -54,7 +54,7 @@ export const DashboardPlataforma = () => {
                 <tr key={e.id}>
                   <td><b style={{ fontWeight: 500 }}>{e.nombre}</b></td>
                   <td className="num">{e.desde}</td>
-                  <td style={{ color: 'var(--muted)', fontSize: 12.5 }}>{e.dominio}</td>
+                  <td style={{ color: 'var(--muted)', fontSize: 12.5 }}>/{e.slug}</td>
                   <td>{e.estado === 'ACTIVA' ? <Pill k="warn">Activa sin uso</Pill> : <Pill k="bad">Suspendida</Pill>}</td>
                 </tr>
               ))}
