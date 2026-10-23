@@ -142,16 +142,23 @@ export const DynamicPortalForm: React.FC<Props> = ({ slug, form, initialAnswers 
       if (final) {
         for (const item of archivos) await maestroApi.uploadPortalDocument(slug, auth, item.field, item.archivo)
       }
-      const registro = await maestroApi.savePortalStep(slug, auth, final ? pasos.length : indice + 1, answers)
+      const registro = await maestroApi.savePortalStep(
+        slug, auth, final ? Math.max(sections.length, pasos.length) : indice + 1, answers,
+      )
       if (!final) {
         for (const item of archivos) await maestroApi.uploadPortalDocument(slug, auth, item.field, item.archivo)
       }
       onGuardado?.(registro)
-      if (final) onListo()
-      else setPaso(p => Math.min(p + 1, pasos.length - 1))
+      if (final) {
+        if (registro.estado === 'enviado') onListo()
+        else setError('El registro sigue abierto. Revise los campos obligatorios y vuelva a enviar.')
+      } else setPaso(p => Math.min(p + 1, pasos.length - 1))
     } catch (e: any) {
       const detail = e?.response?.data?.detail
-      setError(typeof detail === 'string' && detail.trim()
+      const faltantes = Array.isArray(detail?.faltantes) ? detail.faltantes.filter((x: unknown) => typeof x === 'string') : []
+      setError(faltantes.length
+        ? `Faltan campos obligatorios: ${faltantes.join(', ')}.`
+        : typeof detail === 'string' && detail.trim()
         ? detail
         : detail?.message ?? e?.message ?? 'No fue posible guardar el avance.')
     } finally { setGuardando(false) }

@@ -53,11 +53,39 @@ const recordOfSection = (sectionId: string, fields: FieldEditor[]): 'natural' | 
 }
 
 const typeFromApi = (tipo: string): FieldType => ({
-  si_no: 'si-no', seleccion_multiple: 'multiple', email: 'email', documento_identidad: 'documento',
+  si_no: 'si-no', seleccion_multiple: 'multiple', correo: 'email', email: 'email',
+  documento_identidad: 'documento', documento: 'documento',
 }[tipo] as FieldType ?? tipo as FieldType)
 const tipoApi = (tipo: FieldType) => ({
-  'si-no': 'si_no', multiple: 'seleccion_multiple', email: 'correo', document: 'documento_identidad', url: 'url',
+  'si-no': 'si_no', multiple: 'seleccion_multiple', email: 'correo', documento: 'documento_identidad',
 } as Partial<Record<FieldType, string>>)[tipo] ?? tipo
+
+type ValidationItem = { loc?: Array<string | number>; msg?: string; input?: unknown }
+
+/** Turns a 422 into one line per field, using the section and label the editor already has. */
+const publishFailure = (error: unknown, sections: SectionEditor[], fields: FieldEditor[]): string[] => {
+  const body = (error as { response?: { data?: { message?: unknown; data?: unknown } } }).response?.data
+  const items = Array.isArray(body?.data) ? body.data as ValidationItem[] : []
+  if (!items.length) {
+    return [typeof body?.message === 'string' ? body.message : 'No fue posible publicar el formulario en el servidor.']
+  }
+  return items.map(item => {
+    const loc = item.loc ?? []
+    const sectionAt = loc.indexOf('secciones')
+    const fieldAt = loc.indexOf('campos')
+    const section = sectionAt >= 0 && typeof loc[sectionAt + 1] === 'number' ? sections[loc[sectionAt + 1] as number] : undefined
+    const field = section && fieldAt >= 0 && typeof loc[fieldAt + 1] === 'number'
+      ? fields.filter(c => c.section === section.id)[loc[fieldAt + 1] as number]
+      : undefined
+    const clean = (value?: string) => value?.replace(/:\s*$/, '')
+    const place = [clean(section?.name), clean(field?.label)].filter(Boolean).join(', ')
+    const key = loc[loc.length - 1]
+    const problem = key === 'tipo_campo'
+      ? `el tipo “${String(item.input ?? '')}” no es válido`
+      : (item.msg ?? 'dato no válido')
+    return place ? `${place}: ${problem}.` : `${problem}.`
+  })
+}
 
 const definitionForm = (sections: SectionEditor[], fields: FieldEditor[]) => ({
   secciones: sections.map((s, i) => ({
@@ -123,6 +151,7 @@ export const FormEditor = ({ anclado = false, editable = true }: { anclado?: boo
   /** Valores de juguete para que la vista previa reaccione como la real. */
   const [demo, setDemo] = useState<Record<string, unknown>>({})
   const [apiError, setApiError] = useState<string | null>(null)
+  const [publishErrors, setPublishErrors] = useState<string[] | null>(null)
   const [appearance, setAppearance] = useState<ApiFormAppearance>(EMPTY_APPEARANCE)
   const [publishedAppearance, setPublishedAppearance] = useState<ApiFormAppearance>(EMPTY_APPEARANCE)
   const [appearances, setAppearances] = useState<Record<number, ApiFormAppearance>>({})
@@ -576,11 +605,12 @@ export const FormEditor = ({ anclado = false, editable = true }: { anclado?: boo
             <button className="btn pri" disabled={reason.trim().length < 10}
               onClick={() => {
                 const payload = { motivo: reason, ...definitionForm(sections, fields), apariencia: appearance }
+                setPublishErrors(null)
                 maestroApi.publishForm(payload, user?.scope === 'plataforma' ? company.slug : undefined).then(() => {
                   dispatch(publishForm({ id: company.id, sections, fields, reason, user: user!.name }))
                   maestroApi.deleteFormDraft(user?.scope === 'plataforma' ? company.slug : undefined)
                   setPublicando(false)
-                }).catch(() => setApiError('No fue posible publicar el formulario en el servidor.'))
+                }).catch(error => setPublishErrors(publishFailure(error, sections, fields)))
               }}>Publicar</button></>}>
           <p className="dlg-txt">
             La v{current.version} no se modifica: queda como está y esta se agrega encima. Los
@@ -594,6 +624,16 @@ export const FormEditor = ({ anclado = false, editable = true }: { anclado?: boo
             <textarea rows={3} value={reason} onChange={e => setReason(e.target.value)}
               placeholder="Por qué cambia el formulario de esta empresa" />
           </Field>
+        </Modal>
+      )}
+
+      {publishErrors && (
+        <Modal title="No se pudo publicar" onClose={() => setPublishErrors(null)}
+          footer={<button className="btn pri" onClick={() => setPublishErrors(null)}>Cerrar</button>}>
+          <p className="dlg-txt">El servidor rechazó esta versión. Corrija lo que se lista y vuelva a publicar.</p>
+          <ul style={{ margin: '8px 0 0', paddingLeft: 18 }}>
+            {publishErrors.map((line, i) => <li key={i} className="val-err" style={{ marginBottom: 6 }}>{line}</li>)}
+          </ul>
         </Modal>
       )}
 
