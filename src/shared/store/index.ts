@@ -4,16 +4,16 @@ import storage from 'redux-persist/lib/storage'
 import auth from './slices/authSlice'
 import ui from './slices/uiSlice'
 import lang from './slices/langSlice'
-import clientes from '@/features/clientes/store/clientesSlice'
-import usuarios from '@/features/usuarios/store/usuariosSlice'
-import catalogos from '@/features/catalogos/store/catalogosSlice'
-import empresas from '@/features/plataforma/store/empresasSlice'
-import auditoria from '@/shared/auditoria/auditoriaSlice'
-import { describir } from '@/shared/auditoria/describir'
-import notificaciones from '@/shared/notificaciones/notificacionesSlice'
-import { generarNotificaciones } from '@/shared/notificaciones/generar'
+import clients from '@/features/clients/store/clientsSlice'
+import users from '@/features/users/store/usersSlice'
+import catalogs from '@/features/catalogs/store/catalogsSlice'
+import companies from '@/features/platform/store/companiesSlice'
+import audit from '@/shared/audit/auditSlice'
+import { describe } from '@/shared/audit/describe'
+import notifications from '@/shared/notifications/notificationsSlice'
+import { generateNotifications } from '@/shared/notifications/generate'
 
-const root = combineReducers({ auth, ui, lang, clientes, usuarios, catalogos, empresas, auditoria, notificaciones })
+const root = combineReducers({ auth, ui, lang, clients, users, catalogs, companies, audit, notifications })
 
 /**
  * Envoltorio de auditoría sobre el reducer raíz.
@@ -31,16 +31,16 @@ const root = combineReducers({ auth, ui, lang, clientes, usuarios, catalogos, em
  * alguien no puede escaparse por falta de un `dispatch` extra en la pantalla
  * que lo originó.
  */
-const conAuditoria: typeof root = (estado, accion) => {
-  let siguiente = root(estado, accion)
-  if (!estado) return siguiente
+const withAudit: typeof root = (status, action) => {
+  let siguiente = root(status, action)
+  if (!status) return siguiente
 
-  const entrada = describir(accion, estado, siguiente)
+  const entry = describe(action, status, siguiente)
   // Solo se antepone. No hay camino en el código que edite o quite una entrada.
-  if (entrada) siguiente = { ...siguiente, auditoria: { registro: [entrada, ...siguiente.auditoria.registro] } }
+  if (entry) siguiente = { ...siguiente, audit: { registro: [entry, ...siguiente.audit.registro] } }
 
-  const avisos = generarNotificaciones(accion, estado, siguiente)
-  if (avisos.length) siguiente = { ...siguiente, notificaciones: { lista: [...avisos, ...siguiente.notificaciones.lista] } }
+  const notices = generateNotifications(action, status, siguiente)
+  if (notices.length) siguiente = { ...siguiente, notifications: { list: [...notices, ...siguiente.notifications.list] } }
 
   return siguiente
 }
@@ -80,7 +80,7 @@ const conAuditoria: typeof root = (estado, accion) => {
  *       del Maestro. Se renueva también la sesión para no conservar permisos
  *       efectivos calculados con el rol anterior.
  */
-const VERSION_ESTADO = 20
+const STATE_VERSION = 21
 
 /**
  * Porciones cuya forma cambió. Se descartan; el resto se conserva.
@@ -88,24 +88,24 @@ const VERSION_ESTADO = 20
  * Subir la versión sin agregar acá la porción que cambió no sirve de nada: la
  * vieja se rehidrata igual y revienta el primer selector que la lea.
  */
-const INVALIDADAS = ['empresas', 'clientes', 'usuarios', 'auditoria', 'catalogos', 'auth', 'notificaciones']
+const INVALIDATED = ['companies', 'clients', 'users', 'audit', 'catalogs', 'auth', 'notifications']
 
 const persisted = persistReducer({
   key: 'app',
   storage,
-  version: VERSION_ESTADO,
-  whitelist: ['auth', 'ui', 'lang', 'clientes', 'usuarios', 'catalogos', 'empresas', 'auditoria', 'notificaciones'],
+  version: STATE_VERSION,
+  whitelist: ['auth', 'ui', 'lang', 'clients', 'users', 'catalogs', 'companies', 'audit', 'notifications'],
   // Devolver una porción en `undefined` hace que combineReducers use su estado
   // inicial: es la forma limpia de descartar lo incompatible sin tocar el resto.
-  migrate: (estado: any) => {
-    if (!estado) return Promise.resolve(estado)
-    if ((estado._persist?.version ?? -1) < VERSION_ESTADO) return Promise.resolve(undefined)
-    if ((estado._persist?.version ?? -1) >= VERSION_ESTADO) return Promise.resolve(estado)
-    const limpio = { ...estado }
-    INVALIDADAS.forEach(k => { limpio[k] = undefined })
+  migrate: (status: any) => {
+    if (!status) return Promise.resolve(status)
+    if ((status._persist?.version ?? -1) < STATE_VERSION) return Promise.resolve(undefined)
+    if ((status._persist?.version ?? -1) >= STATE_VERSION) return Promise.resolve(status)
+    const limpio = { ...status }
+    INVALIDATED.forEach(k => { limpio[k] = undefined })
     return Promise.resolve(limpio)
   },
-}, conAuditoria)
+}, withAudit)
 
 export const store = configureStore({
   reducer: persisted,

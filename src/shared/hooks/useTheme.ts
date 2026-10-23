@@ -1,10 +1,10 @@
 import { useEffect } from 'react'
 import { useAppDispatch, useAppSelector } from '@/shared/store/hooks'
-import { setTema } from '@/shared/store/slices/uiSlice'
+import { setTheme } from '@/shared/store/slices/uiSlice'
 
 export function useTheme() {
-  const tema = useAppSelector((s) => s.ui.tema)
+  const theme = useAppSelector((s) => s.ui.theme)
   const dispatch = useAppDispatch()
-  useEffect(() => { document.documentElement.dataset.theme = tema }, [tema])
-  return { tema, alternar: () => dispatch(setTema(tema === 'light' ? 'dark' : 'light')) }
+  useEffect(() => { document.documentElement.dataset.theme = theme }, [theme])
+  return { theme, alternar: () => dispatch(setTheme(theme === 'light' ? 'dark' : 'light')) }
 }

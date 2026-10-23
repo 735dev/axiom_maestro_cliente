@@ -1,7 +1,11 @@
 import { useAppSelector } from '@/shared/store/hooks'
-import type { PermissionCode } from '@/shared/auth/permissions'
+import { isPlatformPermission, type PermissionCode } from '@/shared/auth/permissions'
 
 export function useCan(): (p: PermissionCode) => boolean {
-  const permisos = useAppSelector((s) => s.auth.usuario?.permisos ?? [])
-  return (p) => permisos.includes(p)
+  const permissions = useAppSelector((s) => s.auth.user?.permissions ?? [])
+  const scope = useAppSelector((s) => s.auth.user?.scope)
+  return (p) => {
+    if (isPlatformPermission(p)) return scope === 'plataforma'
+    return permissions.includes(p)
+  }
 }

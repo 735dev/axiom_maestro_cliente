@@ -1,17 +1,17 @@
 import { createSlice, type PayloadAction } from '@reduxjs/toolkit'
 
-type Aviso = { tipo: 'error' | 'info'; codigo?: number; texto: string } | null
-type State = { tema: 'light' | 'dark'; aviso: Aviso }
-const initialState: State = { tema: 'light', aviso: null }
+type Notice = { tipo: 'error' | 'info'; code?: number; text: string } | null
+type State = { theme: 'light' | 'dark'; notice: Notice }
+const initialState: State = { theme: 'light', notice: null }
 
 const slice = createSlice({
   name: 'ui',
   initialState,
   reducers: {
-    setTema(s, a: PayloadAction<'light' | 'dark'>) { s.tema = a.payload },
-    mostrarAviso(s, a: PayloadAction<Aviso>) { s.aviso = a.payload },
-    limpiarAviso(s) { s.aviso = null },
+    setTheme(s, a: PayloadAction<'light' | 'dark'>) { s.theme = a.payload },
+    showNotice(s, a: PayloadAction<Notice>) { s.notice = a.payload },
+    clearNotice(s) { s.notice = null },
   },
 })
-export const { setTema, mostrarAviso, limpiarAviso } = slice.actions
+export const { setTheme, showNotice, clearNotice } = slice.actions
 export default slice.reducer

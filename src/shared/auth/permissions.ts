@@ -12,34 +12,35 @@
  */
 
 export const PERMISSIONS = {
-  registrosVer: 'registros.ver',
-  registrosCrear: 'registros.crear',
-  registrosEditar: 'registros.editar',
-  registrosPersonas: 'registros.personas',
-  registrosInactivar: 'registros.inactivar',
-  registrosAprobar: 'registros.aprobar',
-  registrosExportar: 'registros.exportar',
+  recordsView: 'registros.ver',
+  recordsCreate: 'registros.crear',
+  recordsEdit: 'registros.editar',
+  recordsPeople: 'registros.personas',
+  recordsDeactivate: 'registros.inactivar',
+  recordsApprove: 'registros.aprobar',
+  recordsExport: 'registros.exportar',
 
-  catalogosVer: 'catalogos.ver',
-  catalogosGestionar: 'catalogos.gestionar',
-  formularioVer: 'formulario.ver',
-  formularioGestionar: 'formulario.gestionar',
-  empresaConfigurar: 'empresa.configurar',
+  catalogsView: 'catalogos.ver',
+  catalogsManage: 'catalogos.gestionar',
+  formView: 'formulario.ver',
+  formManage: 'formulario.gestionar',
+  companyConfigure: 'empresa.configurar',
+  integrationsManage: 'integraciones.gestionar',
 
-  empresasVer: 'empresas.ver',
-  empresasCrear: 'empresas.crear',
-  empresasEditar: 'empresas.editar',
-  empresasSuspender: 'empresas.suspender',
-  retencionGestionar: 'retencion.gestionar',
+  companiesView: 'empresas.ver',
+  companiesCreate: 'empresas.crear',
+  companiesEdit: 'empresas.editar',
+  companiesSuspend: 'empresas.suspender',
+  retentionManage: 'retencion.gestionar',
 
-  usuariosVer: 'usuarios.ver',
-  usuariosGestionar: 'usuarios.gestionar',
-  rolesGestionar: 'roles.gestionar',
+  usersView: 'usuarios.ver',
+  usersManage: 'usuarios.gestionar',
+  rolesManage: 'roles.gestionar',
 
-  bitacoraVer: 'bitacora.ver',
-  bitacoraExportar: 'bitacora.exportar',
-  reportesVer: 'reportes.ver',
-  reportesEmitir: 'reportes.emitir',
+  auditLogView: 'bitacora.ver',
+  auditLogExport: 'bitacora.exportar',
+  reportsView: 'reportes.ver',
+  reportsIssue: 'reportes.emitir',
 } as const
 
 export type PermissionCode = (typeof PERMISSIONS)[keyof typeof PERMISSIONS]
@@ -52,19 +53,24 @@ export type PermissionCode = (typeof PERMISSIONS)[keyof typeof PERMISSIONS]
  * - `critico`  Decide, saca datos del sistema o reparte poder. Es lo que un
  *              auditor va a revisar primero.
  */
-export type Nivel = 'lectura' | 'escritura' | 'critico'
+export type Level = 'lectura' | 'escritura' | 'critico'
 
-export type Grupo = 'Clientes' | 'Configuración' | 'Plataforma' | 'Administración' | 'Auditoría'
+export type Group = 'Clientes' | 'Configuración' | 'Plataforma' | 'Administración' | 'Auditoría'
 
-export type DefinicionPermiso = {
-  codigo: PermissionCode
-  nombre: string
+export type PermissionDefinition = {
+  code: PermissionCode
+  name: string
   /** Qué habilita, en concreto. Sin esto un rol se arma a ciegas. */
-  descripcion: string
-  grupo: Grupo
-  nivel: Nivel
+  description: string
+  group: Group
+  level: Level
+  /**
+   * `platform` solo lo ejerce el Super Admin (ámbito plataforma).
+   * No se concede ni se muestra en roles de una empresa.
+   */
+  scope?: 'tenant' | 'platform'
   /** Permisos sin los cuales este no sirve. Se conceden junto con él. */
-  implica?: PermissionCode[]
+  implies?: PermissionCode[]
   /**
    * Con cuáles no debería convivir en el mismo rol, y por qué.
    *
@@ -72,145 +78,163 @@ export type DefinicionPermiso = {
    * hace las dos cosas, y esa decisión es del negocio. Lo que el sistema no
    * puede hacer es dejar que ocurra sin que nadie se entere.
    */
-  tension?: { con: PermissionCode; porque: string }
+  tension?: { con: PermissionCode; because: string }
 }
 
 const P = PERMISSIONS
 
-export const CATALOGO: DefinicionPermiso[] = [
+export const CATALOG: PermissionDefinition[] = [
   /* ---------------- Clientes ---------------- */
   {
-    codigo: P.registrosVer, nombre: 'Ver clientes', grupo: 'Clientes', nivel: 'lectura',
-    descripcion: 'Entrar al listado de clientes y abrir la ficha de cualquiera de ellos.',
+    code: P.recordsView, name: 'Ver clientes', group: 'Clientes', level: 'lectura',
+    description: 'Entrar al listado de clientes y abrir la ficha de cualquiera de ellos.',
   },
   {
-    codigo: P.registrosCrear, nombre: 'Registrar clientes', grupo: 'Clientes', nivel: 'escritura',
-    descripcion: 'Dar de alta un cliente nuevo. El sistema le asigna su código.',
-    implica: [P.registrosVer],
+    code: P.recordsCreate, name: 'Registrar clientes', group: 'Clientes', level: 'escritura',
+    description: 'Dar de alta un cliente nuevo. El sistema le asigna su código.',
+    implies: [P.recordsView],
     tension: {
-      con: P.registrosAprobar,
-      porque: 'Quien registra un expediente no debería ser quien lo aprueba. El sistema ya impide que la misma persona haga las dos cosas sobre el mismo cliente, pero tener ambos permisos deja esa protección apoyada en un solo control.',
+      con: P.recordsApprove,
+      because: 'Quien registra un expediente no debería ser quien lo aprueba. El sistema ya impide que la misma persona haga las dos cosas sobre el mismo cliente, pero tener ambos permisos deja esa protección apoyada en un solo control.',
     },
   },
   {
-    codigo: P.registrosEditar, nombre: 'Editar la ficha', grupo: 'Clientes', nivel: 'escritura',
-    descripcion: 'Corregir los datos de un cliente ya registrado. No incluye el veredicto, que lo escribe Prevención.',
-    implica: [P.registrosVer],
+    code: P.recordsEdit, name: 'Editar la ficha', group: 'Clientes', level: 'escritura',
+    description: 'Corregir los datos de un cliente ya registrado. No incluye el veredicto, que lo escribe Prevención.',
+    implies: [P.recordsView],
   },
   {
-    codigo: P.registrosPersonas, nombre: 'Gestionar personas vinculadas', grupo: 'Clientes', nivel: 'escritura',
-    descripcion: 'Agregar y quitar accionistas, beneficiarios finales y representantes legales.',
-    implica: [P.registrosVer],
+    code: P.recordsPeople, name: 'Gestionar personas vinculadas', group: 'Clientes', level: 'escritura',
+    description: 'Agregar y quitar accionistas, beneficiarios finales y representantes legales.',
+    implies: [P.recordsView],
   },
   {
-    codigo: P.registrosInactivar, nombre: 'Inactivar clientes', grupo: 'Clientes', nivel: 'critico',
-    descripcion: 'Sacar un cliente de circulación. No borra: conserva toda su historia y exige motivo escrito.',
-    implica: [P.registrosVer],
+    code: P.recordsDeactivate, name: 'Inactivar clientes', group: 'Clientes', level: 'critico',
+    description: 'Sacar un cliente de circulación. No borra: conserva toda su historia y exige motivo escrito.',
+    implies: [P.recordsView],
   },
   {
-    codigo: P.registrosAprobar, nombre: 'Aprobar o rechazar', grupo: 'Clientes', nivel: 'critico',
-    descripcion: 'Decidir si un cliente queda habilitado. Es la decisión que el regulador va a revisar.',
-    implica: [P.registrosVer],
+    code: P.recordsApprove, name: 'Aprobar, rechazar o inhabilitar', group: 'Clientes', level: 'critico',
+    description: 'Decidir si un cliente queda habilitado. Es la decisión que el regulador va a revisar.',
+    implies: [P.recordsView],
     tension: {
-      con: P.registrosCrear,
-      porque: 'Registrar y aprobar en la misma persona rompe la separación de funciones que sostiene el expediente.',
+      con: P.recordsCreate,
+      because: 'Registrar y aprobar en la misma persona rompe la separación de funciones que sostiene el expediente.',
     },
   },
   {
-    codigo: P.registrosExportar, nombre: 'Exportar clientes', grupo: 'Clientes', nivel: 'critico',
-    descripcion: 'Descargar el listado con sus datos. Saca información personal fuera del sistema, donde ya no hay control sobre ella.',
-    implica: [P.registrosVer],
+    code: P.recordsExport, name: 'Exportar clientes', group: 'Clientes', level: 'critico',
+    description: 'Descargar el listado con sus datos. Saca información personal fuera del sistema, donde ya no hay control sobre ella.',
+    implies: [P.recordsView],
   },
 
   /* ---------------- Configuración ---------------- */
   {
-    codigo: P.catalogosVer, nombre: 'Ver catálogos', grupo: 'Configuración', nivel: 'lectura',
-    descripcion: 'Consultar las listas desplegables del sistema: sectores, actividades, origen de fondos.',
+    code: P.catalogsView, name: 'Ver catálogos', group: 'Configuración', level: 'lectura',
+    description: 'Consultar las listas desplegables del sistema: sectores, actividades, origen de fondos.',
   },
   {
-    codigo: P.catalogosGestionar, nombre: 'Administrar catálogos', grupo: 'Configuración', nivel: 'escritura',
-    descripcion: 'Agregar y quitar valores de esas listas. Los cambios se ven de inmediato en los formularios.',
-    implica: [P.catalogosVer],
+    code: P.catalogsManage, name: 'Administrar catálogos', group: 'Configuración', level: 'escritura',
+    description: 'Agregar y quitar valores de esas listas. Los cambios se ven de inmediato en los formularios.',
+    implies: [P.catalogsView],
   },
   {
-    codigo: P.formularioVer, nombre: 'Ver el formulario de captación', grupo: 'Configuración', nivel: 'lectura',
-    descripcion: 'Consultar qué se le pide al cliente y en qué versión está.',
+    code: P.formView, name: 'Ver el formulario de captación', group: 'Configuración', level: 'lectura',
+    description: 'Consultar qué se le pide al cliente y en qué versión está.',
   },
   {
-    codigo: P.formularioGestionar, nombre: 'Publicar el formulario', grupo: 'Configuración', nivel: 'escritura',
-    descripcion: 'Armar y publicar la versión del formulario que usa el portal y el alta interna.',
-    implica: [P.formularioVer],
+    code: P.formManage, name: 'Componer el formulario de captación', group: 'Configuración', level: 'critico',
+    description: 'Agregar secciones y campos, definir condiciones de visibilidad, y publicar una versión nueva con su motivo.',
+    implies: [P.formView],
   },
   {
-    codigo: P.empresaConfigurar, nombre: 'Configurar la empresa', grupo: 'Configuración', nivel: 'critico',
-    descripcion: 'Cambiar los datos de la empresa, su marca y a qué correos llegan los avisos.',
+    code: P.companyConfigure, name: 'Configurar la empresa', group: 'Configuración', level: 'critico',
+    description: 'Cambiar los datos de la empresa y sus datos de contacto.',
+  },
+  {
+    code: P.integrationsManage, name: 'Administrar credenciales de integración', group: 'Configuración', level: 'critico',
+    description: 'Emitir y revocar las credenciales que usan otros sistemas del grupo, como Axiom Prevención, para conectarse a esta empresa.',
   },
 
-  /* ---------------- Plataforma ---------------- */
+  /* ---------------- Plataforma ----------------
+   * No se arman en un rol de empresa. El Super Admin las ejerce porque su
+   * cuenta es de ámbito plataforma, no porque alguien se las haya concedido.
+   */
   {
-    codigo: P.empresasVer, nombre: 'Ver empresas', grupo: 'Plataforma', nivel: 'lectura',
-    descripcion: 'Ver el padrón de empresas en la consola de plataforma.',
+    code: P.companiesView, name: 'Ver empresas', group: 'Plataforma', level: 'lectura',
+    scope: 'platform',
+    description: 'Ver el padrón de empresas en la consola de plataforma. Solo Super Admin.',
   },
   {
-    codigo: P.empresasCrear, nombre: 'Crear empresas', grupo: 'Plataforma', nivel: 'critico',
-    descripcion: 'Dar de alta una empresa y a su administrador.',
-    implica: [P.empresasVer],
+    code: P.companiesCreate, name: 'Crear empresas', group: 'Plataforma', level: 'critico',
+    scope: 'platform',
+    description: 'Dar de alta una empresa y a su administrador. Solo Super Admin.',
+    implies: [P.companiesView],
   },
   {
-    codigo: P.empresasEditar, nombre: 'Editar empresas', grupo: 'Plataforma', nivel: 'escritura',
-    descripcion: 'Corregir el nombre, el RIF y el portal de una empresa.',
-    implica: [P.empresasVer],
+    code: P.companiesEdit, name: 'Editar empresas', group: 'Plataforma', level: 'escritura',
+    scope: 'platform',
+    description: 'Corregir el nombre, el RIF y el portal de una empresa. Solo Super Admin.',
+    implies: [P.companiesView],
   },
   {
-    codigo: P.empresasSuspender, nombre: 'Suspender empresas', grupo: 'Plataforma', nivel: 'critico',
-    descripcion: 'Suspender o reactivar una empresa. No la borra.',
-    implica: [P.empresasVer],
+    code: P.companiesSuspend, name: 'Suspender empresas', group: 'Plataforma', level: 'critico',
+    scope: 'platform',
+    description: 'Suspender o reactivar una empresa. No la borra. Solo Super Admin.',
+    implies: [P.companiesView],
   },
   {
-    codigo: P.retencionGestionar, nombre: 'Administrar la retención', grupo: 'Plataforma', nivel: 'critico',
-    descripcion: 'Definir cuántos días se conserva un borrador abandonado de cada empresa.',
+    code: P.retentionManage, name: 'Administrar la retención', group: 'Plataforma', level: 'critico',
+    scope: 'platform',
+    description: 'Definir cuántos días se conserva un borrador abandonado de cada empresa. Solo Super Admin.',
   },
 
   /* ---------------- Administración ---------------- */
   {
-    codigo: P.usuariosVer, nombre: 'Ver usuarios y roles', grupo: 'Administración', nivel: 'lectura',
-    descripcion: 'Consultar quién tiene cuenta, con qué rol y qué permisos efectivos.',
+    code: P.usersView, name: 'Ver usuarios y roles', group: 'Administración', level: 'lectura',
+    description: 'Consultar quién tiene cuenta, con qué rol y qué permisos efectivos.',
   },
   {
-    codigo: P.usuariosGestionar, nombre: 'Administrar usuarios', grupo: 'Administración', nivel: 'critico',
-    descripcion: 'Invitar, bloquear y reactivar personas, y darles excepciones de permisos por encima de su rol.',
-    implica: [P.usuariosVer],
+    code: P.usersManage, name: 'Administrar usuarios', group: 'Administración', level: 'critico',
+    description: 'Invitar, bloquear y reactivar personas, y darles excepciones de permisos por encima de su rol.',
+    implies: [P.usersView],
   },
   {
-    codigo: P.rolesGestionar, nombre: 'Administrar roles y permisos', grupo: 'Administración', nivel: 'critico',
-    descripcion: 'Crear roles y decidir qué puede hacer cada uno. Quien tiene esto puede concederse cualquier otro permiso de esta lista.',
-    implica: [P.usuariosVer],
+    code: P.rolesManage, name: 'Administrar roles y permisos', group: 'Administración', level: 'critico',
+    description: 'Crear roles y decidir qué puede hacer cada uno. Quien tiene esto puede concederse cualquier otro permiso de esta lista.',
+    implies: [P.usersView],
   },
 
   /* ---------------- Auditoría ---------------- */
   {
-    codigo: P.bitacoraVer, nombre: 'Consultar la bitácora', grupo: 'Auditoría', nivel: 'lectura',
-    descripcion: 'Ver todo lo que pasó en el sistema: quién, cuándo, qué y por qué.',
+    code: P.auditLogView, name: 'Consultar la bitácora', group: 'Auditoría', level: 'lectura',
+    description: 'Ver todo lo que pasó en el sistema: quién, cuándo, qué y por qué.',
   },
   {
-    codigo: P.bitacoraExportar, nombre: 'Exportar la bitácora', grupo: 'Auditoría', nivel: 'critico',
-    descripcion: 'Descargar el registro para entregarlo a un auditor o al regulador.',
-    implica: [P.bitacoraVer],
+    code: P.auditLogExport, name: 'Exportar la bitácora', group: 'Auditoría', level: 'critico',
+    description: 'Descargar el registro para entregarlo a un auditor o al regulador.',
+    implies: [P.auditLogView],
   },
   {
-    codigo: P.reportesVer, nombre: 'Ver reportes', grupo: 'Auditoría', nivel: 'lectura',
-    descripcion: 'Consultar los reportes emitidos y verificar uno por su código.',
+    code: P.reportsView, name: 'Ver reportes', group: 'Auditoría', level: 'lectura',
+    description: 'Consultar los reportes emitidos y verificar uno por su código.',
   },
   {
-    codigo: P.reportesEmitir, nombre: 'Emitir reportes', grupo: 'Auditoría', nivel: 'escritura',
-    descripcion: 'Generar un reporte de consulta con código verificable. Queda en la bitácora a nombre de quien lo emitió.',
-    implica: [P.reportesVer],
+    code: P.reportsIssue, name: 'Emitir reportes', group: 'Auditoría', level: 'escritura',
+    description: 'Generar un reporte de consulta con código verificable. Queda en la bitácora a nombre de quien lo emitió.',
+    implies: [P.reportsView],
   },
 ]
 
-export const GRUPOS: Grupo[] = ['Clientes', 'Configuración', 'Plataforma', 'Administración', 'Auditoría']
+export const GROUPS: Group[] = ['Clientes', 'Configuración', 'Plataforma', 'Administración', 'Auditoría']
 
-export const definicionDe = (c: string) => CATALOGO.find(p => p.codigo === c)
+export const definitionOf = (c: string) => CATALOG.find(p => p.code === c)
+
+export const isPlatformPermission = (c: string) => definitionOf(c)?.scope === 'platform'
+
+/** Lo que una empresa puede conceder. Lo de plataforma no entra. */
+export const TENANT_CATALOG = CATALOG.filter(p => p.scope !== 'platform')
+export const TENANT_GROUPS: Group[] = GROUPS.filter(g => g !== 'Plataforma')
 
 /**
  * Agrega los permisos que el elegido necesita para servir de algo.
@@ -219,12 +243,12 @@ export const definicionDe = (c: string) => CATALOGO.find(p => p.codigo === c)
  * abrir la pantalla donde está el botón. En vez de dejar que alguien lo
  * descubra en producción, se conceden juntos.
  */
-export function conImplicados(permisos: PermissionCode[]): PermissionCode[] {
-  const set = new Set(permisos)
+export function withImplied(permissions: PermissionCode[]): PermissionCode[] {
+  const set = new Set(permissions)
   let creció = true
   while (creció) {
     creció = false
-    set.forEach(c => definicionDe(c)?.implica?.forEach(i => {
+    set.forEach(c => definitionOf(c)?.implies?.forEach(i => {
       if (!set.has(i)) { set.add(i); creció = true }
     }))
   }
@@ -232,18 +256,18 @@ export function conImplicados(permisos: PermissionCode[]): PermissionCode[] {
 }
 
 /** Permisos que quedarían sin sentido si se quita este. */
-export const dependenDe = (c: PermissionCode) =>
-  CATALOGO.filter(p => p.implica?.includes(c)).map(p => p.codigo)
+export const dependOn = (c: PermissionCode) =>
+  CATALOG.filter(p => p.implies?.includes(c)).map(p => p.code)
 
 /** Pares en tensión dentro de un mismo conjunto de permisos. */
-export function tensiones(permisos: PermissionCode[]) {
-  const set = new Set(permisos)
+export function tensions(permissions: PermissionCode[]) {
+  const set = new Set(permissions)
   const vistos = new Set<string>()
-  return CATALOGO.flatMap(p => {
-    if (!p.tension || !set.has(p.codigo) || !set.has(p.tension.con)) return []
-    const llave = [p.codigo, p.tension.con].sort().join('|')
+  return CATALOG.flatMap(p => {
+    if (!p.tension || !set.has(p.code) || !set.has(p.tension.con)) return []
+    const llave = [p.code, p.tension.con].sort().join('|')
     if (vistos.has(llave)) return []
     vistos.add(llave)
-    return [{ a: p.codigo, b: p.tension.con, porque: p.tension.porque }]
+    return [{ a: p.code, b: p.tension.con, because: p.tension.because }]
   })
 }

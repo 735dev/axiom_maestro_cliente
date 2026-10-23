@@ -21,25 +21,36 @@ export const Tabs: React.FC<{ items: string[]; value: string; onChange: (v: stri
 
 export const Field: React.FC<{
   label: string; value?: string; mono?: boolean; error?: string; hint?: string
+  /** Texto que se muestra al pulsar el botón de ayuda, junto a la etiqueta. */
+  help?: string
   /** Extra para cuando el campo vive en una rejilla y necesita, por ejemplo, ocupar toda la fila. */
   className?: string
   children?: React.ReactNode
-}> = ({ label, value, mono, error, hint, className, children }) => (
-  <div className={cn('f', error && 'bad', className)}>
-    <label>{label}</label>
-    {children ?? <div className={cn('ro', mono && 'm')}>{value || '—'}</div>}
-    {error ? <span className="err">{error}</span> : hint ? <span className="hint">{hint}</span> : null}
-  </div>
-)
+}> = ({ label, value, mono, error, hint, help, className, children }) => {
+  const [helpOpen, setHelpOpen] = React.useState(false)
+  return (
+    <div className={cn('f', error && 'bad', className)}>
+      <label>
+        {label}
+        {help && (
+          <button type="button" className="f-ayuda" aria-expanded={helpOpen} aria-label={`Ayuda: ${label}`}
+            onClick={() => setHelpOpen(open => !open)}>?</button>
+        )}
+      </label>
+      {children ?? <div className={cn('ro', mono && 'm')}>{value || '—'}</div>}
+      {error ? <span className="err">{error}</span> : helpOpen && help ? <span className="hint">{help}</span> : hint ? <span className="hint">{hint}</span> : null}
+    </div>
+  )
+}
 
 export const Kpi: React.FC<{ label: string; value: React.ReactNode; foot?: string }> = ({ label, value, foot }) => (
   <div className="kpi"><span>{label}</span><b>{value}</b>{foot && <i>{foot}</i>}</div>
 )
 
-export const Modal: React.FC<{ title: string; onClose: () => void; footer?: React.ReactNode; children: React.ReactNode }> =
-  ({ title, onClose, footer, children }) => (
+export const Modal: React.FC<{ title: string; onClose: () => void; footer?: React.ReactNode; wide?: boolean; children: React.ReactNode }> =
+  ({ title, onClose, footer, wide, children }) => (
     <div className="modal-bg" onClick={onClose}>
-      <div className="modal" onClick={e => e.stopPropagation()}>
+      <div className={cn('modal', wide && 'modal-ancha')} onClick={e => e.stopPropagation()}>
         <div className="modal-h"><h3>{title}</h3><button className="x" onClick={onClose}>×</button></div>
         <div className="modal-b">{children}</div>
         {footer && <div className="modal-f">{footer}</div>}
@@ -47,7 +58,7 @@ export const Modal: React.FC<{ title: string; onClose: () => void; footer?: Reac
     </div>
   )
 
-export { Paginador } from './Paginador'
+export { Paginator } from './Paginator'
 
-export { Listado } from './Listado'
-export type { Columna, Filtro, Chip } from './Listado'
+export { Listing } from './Listing'
+export type { Column, Filter, Chip } from './Listing'

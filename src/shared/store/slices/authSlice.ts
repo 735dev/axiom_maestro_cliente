@@ -10,25 +10,25 @@ import { createSlice, type PayloadAction } from '@reduxjs/toolkit'
  *
  * `empresaId` es null para el ámbito plataforma: no pertenece a ninguna.
  */
-export type Ambito = 'plataforma' | 'empresa'
+export type Scope = 'plataforma' | 'empresa'
 
-export type Usuario = {
-  id: string; nombre: string; rol: string; permisos: string[]
+export type User = {
+  id: string; name: string; rol: string; permissions: string[]
   email?: string
-  ambito: Ambito
-  empresaId: string | null
+  scope: Scope
+  companyId: string | null
 }
-type State = { token: string | null; usuario: Usuario | null }
-const initialState: State = { token: null, usuario: null }
+type State = { token: string | null; user: User | null }
+const initialState: State = { token: null, user: null }
 
 const slice = createSlice({
   name: 'auth',
   initialState,
   reducers: {
-    login(s, a: PayloadAction<{ token: string; usuario: Usuario }>) {
-      s.token = a.payload.token; s.usuario = a.payload.usuario
+    login(s, a: PayloadAction<{ token: string; user: User }>) {
+      s.token = a.payload.token; s.user = a.payload.user
     },
-    logout(s) { s.token = null; s.usuario = null },
+    logout(s) { s.token = null; s.user = null },
   },
 })
 export const { login, logout } = slice.actions

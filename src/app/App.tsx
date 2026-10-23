@@ -1,15 +1,15 @@
 import { Routes, Route, Navigate } from 'react-router-dom'
-import { EntradaPublicaPage, PortalPublicoPage } from '@/features/portal/pages/PortalPublicoPage'
+import { PublicEntryPage, PublicPortalPage } from '@/features/portal/pages/PublicPortalPage'
 import { LoginPage } from '@/features/auth/pages/LoginPage'
-import { PanelShell } from './PanelShell'
-import { RutaProtegida, RutaPlataforma } from './RutaProtegida'
-import { PlataformaPage } from '@/features/plataforma/pages/PlataformaPage'
+import { AppShell } from './AppShell'
+import { ProtectedRoute, PlatformRoute } from './ProtectedRoute'
+import { PlatformPage } from '@/features/platform/pages/PlatformPage'
 
 /**
  * Dos zonas separadas, no dos pestañas de la misma pantalla:
  *
  *   /             público   — no abre ninguna empresa
- *   /:empresaSlug público   — el cliente se autogestiona, sin cuenta
+ *   /:companySlug público   — el cliente se autogestiona, sin cuenta
  *   /acceso       público   — inicio de sesión, único para todo el personal
  *   /panel        protegido — el sistema interno de la empresa
  *   /plataforma   protegido — consola de Axiom, ámbito 'plataforma'
@@ -25,14 +25,14 @@ import { PlataformaPage } from '@/features/plataforma/pages/PlataformaPage'
 export function App() {
   return (
     <Routes>
-      <Route path="/" element={<EntradaPublicaPage />} />
+      <Route path="/" element={<PublicEntryPage />} />
       <Route path="/acceso" element={<LoginPage />} />
       <Route path="/login" element={<Navigate to="/acceso" replace />} />
-      <Route path="/:empresaSlug" element={<PortalPublicoPage />} />
-      <Route path="/panel/*" element={<RutaProtegida><PanelShell /></RutaProtegida>} />
+      <Route path="/:companySlug" element={<PublicPortalPage />} />
+      <Route path="/panel/*" element={<ProtectedRoute><AppShell /></ProtectedRoute>} />
       {/* La puerta vieja de plataforma queda apuntando a la única que hay. */}
       <Route path="/plataforma/acceso" element={<Navigate to="/acceso" replace />} />
-      <Route path="/plataforma" element={<RutaPlataforma><PlataformaPage /></RutaPlataforma>} />
+      <Route path="/plataforma/*" element={<PlatformRoute><PlatformPage /></PlatformRoute>} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   )
