@@ -7,7 +7,7 @@ type State = { list: Client[]; auditLog: AuditLogEntry[]; nextCode: number }
 const initialState: State = {
   list: CLIENTS,
   auditLog: AUDIT_LOG.filter(b => b.sistema === 'Maestro'),
-  nextCode: 6,
+  nextCode: 1,
 }
 
 /** Sella la entrada con el actor tal como es en este momento. */

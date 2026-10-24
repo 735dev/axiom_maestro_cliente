@@ -164,7 +164,7 @@ const NewUser: React.FC<{ onClose: () => void }> = ({ onClose }) => {
         </Field>
         <Field label="Correo" error={tocado.email ? emailError ?? undefined : undefined}>
           <input value={d.email} onChange={e => setD({ ...d, email: e.target.value })}
-            onBlur={() => setTocado(t => ({ ...t, email: true }))} placeholder="usuario@transvalor.com" />
+            onBlur={() => setTocado(t => ({ ...t, email: true }))} placeholder="usuario@fondoganadero.demo" />
         </Field>
         <Field label="Rol">
           <select value={d.rolId} onChange={e => setD({ ...d, rolId: e.target.value })}>

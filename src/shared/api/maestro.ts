@@ -89,6 +89,7 @@ export const maestroApi = {
   editUser: (id: string, name: string, roleId: string) =>
     httpClient.patch<ApiEnvelope<ApiUser>>(`/administracion/usuarios/${id}`, { nombre_completo: name, rol_id: roleId }).then(r => r.data.data),
   replaceRolePermissions: (id: string, permiso_ids: string[]) => httpClient.put(`/administracion/roles/${id}/permisos`, { permiso_ids }),
+  deleteCompany: (id: string) => httpClient.delete(`/administracion/empresas/${id}`),
   draftRetentions: () => httpClient.get<ApiEnvelope<ApiDraftRetention[]>>('/administracion/retencion-borradores').then(r => r.data.data),
   updateDraftRetention: (companyId: string, days: number) => httpClient.patch<ApiEnvelope<ApiDraftRetention>>(`/administracion/retencion-borradores/${companyId}`, { dias: days }).then(r => r.data.data),
   userException: (id: string, permiso_id: string, granted: boolean, reason: string) =>

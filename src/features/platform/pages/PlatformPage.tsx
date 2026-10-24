@@ -4,8 +4,8 @@ import { Listing, Pill, Modal, Field } from '@/shared/ui'
 import { useAppDispatch, useAppSelector } from '@/shared/store/hooks'
 import { login, logout } from '@/shared/store/slices/authSlice'
 import {
-  createCompany, changeCompanyStatus, editCompany, currentVersion,
-  type Company,
+  createCompany, changeCompanyStatus, deleteCompany, editCompany, currentVersion,
+  companyIsEmpty, type Company,
 } from '../store/companiesSlice'
 import { FormEditor } from './FormEditorPage'
 import { PlatformDashboard } from './PlatformDashboard'
@@ -30,7 +30,7 @@ import { Module } from '@/app/Module'
  */
 const RUTAS = [
   { id: 'resumen', label: 'Dashboard', title: 'Resumen', sub: 'Estado de la plataforma y uso del producto.' },
-  { id: 'empresas', label: 'Empresas', title: 'Empresas', sub: 'Altas, suspensiones y portal de cada una.', permission: PERMISSIONS.companiesView },
+  { id: 'empresas', label: 'Empresas', title: 'Empresas', sub: 'Altas, suspensiones, portal y baja de las que todavía no tienen datos.', permission: PERMISSIONS.companiesView },
   { id: 'formularios', label: 'Formularios', title: 'Formularios', sub: 'Qué le pide cada empresa a sus clientes.', permission: PERMISSIONS.formView },
   { id: 'usuarios', label: 'Usuarios', title: 'Usuarios', sub: 'Todo el padrón: las empresas y también Axiom.', permission: PERMISSIONS.usersView },
   { id: 'roles', label: 'Roles', title: 'Roles', sub: 'Quién puede qué, y hasta dónde llega cada rol.', permission: PERMISSIONS.rolesManage },
@@ -165,6 +165,8 @@ const DraftRetention = () => {
 }
 
 /* ---------------- Empresas ---------------- */
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
 const Companies = () => {
   const companies = useAppSelector(s => s.companies.list)
   const clients = useAppSelector(s => s.clients.list)
@@ -172,6 +174,8 @@ const Companies = () => {
   const dispatch = useAppDispatch()
   const [adding, setAdding] = useState(false)
   const [edit, setEditing] = useState<Company | null>(null)
+  const [removing, setRemoving] = useState<Company | null>(null)
+  const [borrando, setBorrando] = useState(false)
   const can = useCan()
   const [q, setQ] = useState('')
   const [status, setStatus] = useState('Todas')
@@ -179,6 +183,36 @@ const Companies = () => {
   const list = companies.filter(e =>
     (status === 'Todas' || e.status === status) &&
     (e.name + e.rif + e.slug).toLowerCase().includes(q.trim().toLowerCase()))
+
+  const remove = async (e: Company) => {
+    const clientes = clients.filter(c => c.companyId === e.id).length
+    if (!companyIsEmpty(e, clientes)) {
+      dispatch(showNotice({ tipo: 'error', text: 'Solo se borra una empresa sin clientes y sin formulario.' }))
+      return
+    }
+    setBorrando(true)
+    try {
+      if (UUID_RE.test(e.id)) {
+        try {
+          await maestroApi.deleteCompany(e.id)
+        } catch (err: unknown) {
+          const statusCode = (err as { response?: { status?: number } })?.response?.status
+          if (statusCode === 409) {
+            dispatch(showNotice({ tipo: 'error', text: 'La empresa ya tiene datos y no se puede borrar.' }))
+            return
+          }
+          if (statusCode && statusCode !== 404) {
+            dispatch(showNotice({ tipo: 'error', text: 'No fue posible borrar la empresa.' }))
+            return
+          }
+        }
+      }
+      dispatch(deleteCompany(e.id))
+      setRemoving(null)
+    } finally {
+      setBorrando(false)
+    }
+  }
 
   return (
     <>
@@ -223,6 +257,9 @@ const Companies = () => {
                 }))}>
                   {e.status === 'ACTIVA' ? 'Suspender' : 'Reactivar'}
                 </button>}
+                {can(PERMISSIONS.companiesDelete) && companyIsEmpty(e, clients.filter(c => c.companyId === e.id).length) && (
+                  <button className="btn sm" onClick={() => setRemoving(e)}>Borrar</button>
+                )}
               </div>
             </td>
           </>
@@ -231,6 +268,19 @@ const Companies = () => {
 
       {adding && <NewCompany onClose={() => setAdding(false)} />}
       {edit && <EditCompany company={edit} onClose={() => setEditing(null)} />}
+      {removing && (
+        <Modal title={`Borrar ${removing.name}`} onClose={() => !borrando && setRemoving(null)}
+          footer={<>
+            <button className="btn" disabled={borrando} onClick={() => setRemoving(null)}>Cancelar</button>
+            <button className="btn pri" disabled={borrando} onClick={() => void remove(removing)}>
+              {borrando ? 'Borrando…' : 'Borrar empresa'}
+            </button>
+          </>}>
+          <p className="dlg-txt">
+            No tiene clientes ni formulario. Se quita de la plataforma y su administrador deja de poder entrar.
+          </p>
+        </Modal>
+      )}
     </>
   )
 }
@@ -244,7 +294,7 @@ const EditCompany: React.FC<{ company: Company; onClose: () => void }> = ({ comp
   const nameError = d.name.trim().length < 3 ? 'Escriba al menos 3 caracteres.'
     : otras.some(e => e.name.toLowerCase() === d.name.trim().toLowerCase()) ? 'Ya existe una empresa con ese nombre.' : null
   const errSlug = !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(d.slug.trim())
-    ? 'Use minúsculas, números y guiones; por ejemplo transvalor-orinoco-c-a.'
+    ? 'Use minúsculas, números y guiones; por ejemplo fondo-ganadero.'
     : otras.some(e => e.slug.toLowerCase() === d.slug.trim().toLowerCase()) ? 'Ese portal ya está en uso.' : null
   const ok = !nameError && !errSlug
   const save = () => {
@@ -271,7 +321,7 @@ const EditCompany: React.FC<{ company: Company; onClose: () => void }> = ({ comp
       <Field label="Portal" error={tocado ? errSlug ?? undefined : undefined}
         hint={!errSlug ? 'La ruta será /' + (d.slug || 'su-portal') + '.' : undefined}>
         <input value={d.slug} onChange={e => setD({ ...d, slug: e.target.value.toLowerCase().replace(/\s+/g, '-') })}
-          placeholder="transvalor-orinoco-c-a" />
+          placeholder="fondo-ganadero" />
       </Field>
     </Modal>
   )
@@ -287,7 +337,7 @@ const NewCompany: React.FC<{ onClose: () => void }> = ({ onClose }) => {
   const nameError = d.name.trim().length < 3 ? 'Escriba al menos 3 caracteres.'
     : companies.some(e => e.name.toLowerCase() === d.name.trim().toLowerCase()) ? 'Ya existe una empresa con ese nombre.' : null
   const errSlug = !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(d.slug.trim())
-    ? 'Use minúsculas, números y guiones; por ejemplo transvalor-orinoco-c-a.'
+    ? 'Use minúsculas, números y guiones; por ejemplo fondo-ganadero.'
     : companies.some(e => e.slug.toLowerCase() === d.slug.trim().toLowerCase()) ? 'Ese portal ya está en uso.' : null
   const adminNameError = d.adminName.trim().length < 5 ? 'Nombre y apellido del administrador.' : null
   const adminEmailError = !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(d.adminEmail.trim())
@@ -322,7 +372,7 @@ const NewCompany: React.FC<{ onClose: () => void }> = ({ onClose }) => {
       <Field label="Portal" error={tocado ? errSlug ?? undefined : undefined}
         hint={!errSlug ? 'La ruta será /' + (d.slug || 'su-portal') + '.' : undefined}>
         <input value={d.slug} onChange={e => setD({ ...d, slug: e.target.value.toLowerCase().replace(/\s+/g, '-') })}
-          placeholder="transvalor-orinoco-c-a" />
+          placeholder="fondo-ganadero" />
       </Field>
 
       <div className="sec">Su administrador</div>

@@ -46,10 +46,10 @@ export type Section = { id: SectionId; name: string; sub: string }
  *
  * - **Axiom** declara qué catálogos existen. Van atados a una columna que
  *   comparten todas las empresas, así que el conjunto no puede depender de
- *   cada una: si Transvalor llamara "Rubro" a lo que Seguros llama "Sector",
- *   ningún informe podría cruzar las dos.
- * - **Cada empresa** administra los valores del suyo. Transvalor tiene
- *   sectores que una aseguradora no, y agregar uno no debe requerir
+ *   cada una: si una llamara "Rubro" a lo que otra llama "Sector", ningún
+ *   informe podría cruzar las dos.
+ * - **Cada empresa** administra los valores del suyo. El fondo ganadero tiene
+ *   orígenes de fondos que otra empresa no, y agregar uno no debe requerir
  *   desarrollo ni pedirle permiso a Axiom.
  */
 export type CatalogId = string

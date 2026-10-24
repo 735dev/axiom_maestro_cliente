@@ -9,7 +9,7 @@ export type PortalStep = {
 
 /** Paper headings stay on the page. The sidebar shows one block, not one step per heading. */
 const BLOCKS: { id: string; title: string; keys: string[] }[] = [
-  { id: 'tipo', title: 'Tipo de cliente', keys: ['tipo de cliente'] },
+  { id: 'tipo', title: 'Tipo de inversionista', keys: ['tipo de inversionista', 'tipo de cliente'] },
   {
     id: 'identificacion',
     title: 'Identificación',
@@ -23,6 +23,8 @@ const BLOCKS: { id: string; title: string; keys: string[] }[] = [
       'última modificación',
       'entes públicos',
       'contacto de la empresa',
+      'persona natural',
+      'persona jurídica',
     ],
   },
   {
@@ -51,6 +53,8 @@ const BLOCKS: { id: string; title: string; keys: string[] }[] = [
       'otros ingresos',
       'empresas relacionadas',
       'información del servicio de transporte de valores orinoco, c.a.',
+      'aporte al fondo',
+      'origen de los fondos',
     ],
   },
   {
@@ -61,6 +65,8 @@ const BLOCKS: { id: string; title: string; keys: string[] }[] = [
       'motivos, origen y destino de los fondos',
       'declaración jurada de origen y destino de los fondos',
       'funcionario de transvalor orinoco, c.a',
+      'declaración',
+      'soportes',
     ],
   },
 ]

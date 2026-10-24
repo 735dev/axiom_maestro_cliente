@@ -307,7 +307,7 @@ export const NewClientPage: React.FC<Props> = ({ onListo, onCancelar, draft, onD
           )}
 
           {paso === 2 && (
-            <Card title="Contacto y domicilio" sub="Por dónde Transvalor se comunica con el cliente.">
+            <Card title="Contacto y domicilio" sub="Por dónde el fondo se comunica con el inversionista.">
               <div className={grilla(5)}>
                 <Field label="Domicilio fiscal" error={e('address')}>
                   <input value={d.address} onChange={set('address')} onBlur={marcar('address')} placeholder="Dirección completa" /></Field>

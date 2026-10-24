@@ -40,42 +40,23 @@ export const currentVersion = (e: Company) => e.form[e.form.length - 1]
 /** Cuántos campos del formulario no salen del catálogo estándar. */
 export const customFields = (e: Company) => currentVersion(e).fields.filter(c => !c.standard).length
 
-const HOY = '2026-09-01'
+export const FONDO_GANADERO_ID = 'fondo-ganadero'
+export const FONDO_GANADERO_SLUG = 'fondo-ganadero'
 
-const v1 = (sections: Section[], fields: FormField[], start: string): FormVersion => ({
-  version: 1, start, sections, fields,
-  publicadaPor: 'Axiom Core Tech', reason: 'Puesta en marcha.',
-})
-
-/**
- * Historial de ejemplo de Transvalor: arranca en v1 y publica una v2 con
- * cambios de los tres tipos —agregado, quitado y modificado— para que el
- * comparador tenga algo real que mostrar.
- */
-const transvalor = (sections: Section[], fields: FormField[]): FormVersion[] => {
-  const uno = v1(sections, fields, '2026-08-04')
-
-  const dos: FormVersion = {
-    version: 2, start: '2026-09-01',
-    publicadaPor: 'Rosa Marcano',
-    reason: 'Instrucción de la Unidad de Prevención: se exige el documento constitutivo y se deja de pedir el capital, que no se usaba.',
-    sections: [
-      ...uno.sections.map(x => x.id === 'b4' ? { ...x, name: 'Perfil económico y operativo' } : x),
-      { id: 'b5', name: 'Declaraciones', sub: 'Lo que el cliente afirma bajo su responsabilidad.' },
-    ],
-    fields: [
-      ...uno.fields
-        .filter(c => c.id !== 'cX')
-        .map(c => c.id === 'c7' ? { ...c, required: true } : c),
-      { id: 'c24', section: 'b5', label: 'Declara que los fondos son de origen lícito', tipo: 'si-no', required: true },
-    ],
-  }
-  // v1 tenía un campo que v2 ya no pide.
-  uno.fields = [...uno.fields, { id: 'cX', section: 'b1', label: 'Capital social', tipo: 'moneda', required: false, standard: 'capital' }]
-  return [uno, dos]
+const HOY = '2026-10-24'
+const NATURAL = 'Persona natural'
+const JURIDICA = 'Persona jurídica'
+const whenNatural: FormField['condition'] = {
+  enlace: 'y', conditions: [{ fieldId: 'tipo_persona', operador: 'igual', value: NATURAL }],
+}
+const whenLegal: FormField['condition'] = {
+  enlace: 'y', conditions: [{ fieldId: 'tipo_persona', operador: 'igual', value: JURIDICA }],
 }
 
-/** Atajo para armar campos de demostración sin repetir el tipo del catálogo. */
+const DECLARACION =
+  'Declaro que los fondos aportados al Fondo Ganadero provienen de actividades lícitas, que esta ficha es cierta y que autorizo su uso para la debida diligencia del inversionista.'
+
+/** Atajo para armar campos del catálogo estándar. */
 const est = (id: string, section: string, key: string, required = true, extra: Partial<FormField> = {}): FormField => {
   const e = STANDARD_FIELDS.find(x => x.key === key)!
   return {
@@ -85,75 +66,78 @@ const est = (id: string, section: string, key: string, required = true, extra: P
 }
 
 /**
- * Empresas de ejemplo. Cada una armó un formulario distinto, que es
- * exactamente el punto: la plataforma no impone ninguno.
+ * Una sola empresa: el Fondo Ganadero. La ficha regula a los inversionistas
+ * que entran al ganado — persona natural o jurídica — con origen de fondos,
+ * PEP y soportes.
  */
 export const INITIAL_COMPANIES: Company[] = [
   {
-    // Sujeto obligado completo: usa todo el catálogo.
-    id: 'transvalor', slug: 'transvalor-orinoco-c-a', name: 'Transvalor', rif: 'J-30512345-9',
-    dominio: 'registro.transvalor.com', status: 'ACTIVA', start: '2026-09-01',
-    form: transvalor([
-        { id: 'b1', name: 'Datos de la empresa', sub: 'Quién es la compañía.' },
-        { id: 'b2', name: 'Contacto', sub: 'Por dónde nos comunicamos.' },
-        { id: 'b3', name: 'Accionistas y representantes', sub: 'Quién está detrás.' },
-        { id: 'b4', name: 'Perfil económico', sub: 'Qué espera movilizar.' },
-      ], [
-        est('c0', 'b1', 'tipo_persona'),
-        est('c1', 'b1', 'nombre'),
-        est('c2', 'b1', 'documento'),
-        est('c3', 'b1', 'tipo_empresa', false),
-        est('c4', 'b1', 'sector'),
-        est('c5', 'b1', 'actividad'),
-        est('c6', 'b1', 'registro_mercantil', false),
-        { id: 'c7', section: 'b1', label: 'Documento constitutivo', tipo: 'archivo', required: true, help: 'PDF del acta vigente.' },
-        est('c8', 'b2', 'correo'),
-        est('c9', 'b2', 'telefono'),
-        est('c10', 'b2', 'domicilio'),
-        est('c11', 'b2', 'pais'),
-        est('c12', 'b2', 'web', false),
-        est('c13', 'b3', 'persona_nombre'),
-        est('c14', 'b3', 'persona_documento'),
-        est('c15', 'b3', 'persona_rol'),
-        est('c16', 'b3', 'persona_participacion', false),
-        est('c17', 'b3', 'persona_nacionalidad'),
-        est('c18', 'b3', 'persona_pep'),
-        {
-          id: 'c19', section: 'b3', label: 'Organismo donde ejerce', tipo: 'texto', required: true,
-          condition: { enlace: 'y', conditions: [{ fieldId: 'c18', operador: 'igual', value: 'si' }] },
-        },
-        est('c20', 'b4', 'origen_fondos'),
-        est('c21', 'b4', 'ingresos'),
-        est('c22', 'b4', 'monto_declarado'),
-        est('c23', 'b4', 'frecuencia'),
-      ]),
-  },
-  {
-    // No hace screening de personas: su formulario es corto y no toca PEP.
-    id: 'demo-seguros', slug: 'empresa-demo-dos-c-a', name: 'Seguros del Centro', rif: 'J-31998877-1',
-    dominio: 'clientes.segurosdelcentro.com', status: 'ACTIVA', start: '2026-08-15',
-    form: [v1(
-      [
-        { id: 'b1', name: 'Datos del tomador', sub: 'Quién contrata la póliza.' },
-        { id: 'b2', name: 'Cobertura', sub: 'Qué se quiere asegurar.' },
+    id: FONDO_GANADERO_ID,
+    slug: FONDO_GANADERO_SLUG,
+    name: 'Fondo Ganadero, C.A.',
+    rif: 'J-00000003-3',
+    dominio: FONDO_GANADERO_SLUG,
+    status: 'ACTIVA',
+    start: HOY,
+    form: [{
+      version: 1,
+      start: HOY,
+      publicadaPor: 'Axiom Core Tech',
+      reason: 'Ficha de inversionista del Fondo Ganadero.',
+      sections: [
+        { id: 'b1', name: 'Tipo de inversionista', sub: 'Persona natural o jurídica.' },
+        { id: 'b2', name: 'Persona natural', sub: 'Datos de quien aporta a título personal.' },
+        { id: 'b3', name: 'Persona jurídica', sub: 'Datos de la empresa inversionista.' },
+        { id: 'b4', name: 'Contacto', sub: 'Por dónde se comunica el fondo con el inversionista.' },
+        { id: 'b5', name: 'Aporte al fondo', sub: 'Monto, moneda, plazo y frecuencia.' },
+        { id: 'b6', name: 'Origen de los fondos', sub: 'De dónde salen los recursos y si es PEP.' },
+        { id: 'b7', name: 'Declaración', sub: 'El inversionista afirma y acepta.' },
+        { id: 'b8', name: 'Soportes', sub: 'Documentos que respaldan la ficha.' },
       ],
-      [
-        est('c1', 'b1', 'nombre'),
-        est('c2', 'b1', 'documento'),
-        est('c3', 'b1', 'correo'),
-        est('c4', 'b1', 'telefono'),
-        { id: 'c5', section: 'b2', label: 'Tipo de póliza', tipo: 'lista', required: true, options: ['Vehículo', 'Salud', 'Patrimonial', 'Vida'] },
-        { id: 'c6', section: 'b2', label: 'Suma asegurada', tipo: 'moneda', required: true },
-        { id: 'c7', section: 'b2', label: 'Inicio de vigencia', tipo: 'fecha', required: true },
-      ], '2026-08-15')],
-  },
-  {
-    // Recién dada de alta: el formulario está en blanco.
-    id: 'demo-casa', slug: 'casa-de-bolsa-andina', name: 'Casa de Bolsa Andina', rif: 'J-40223344-7',
-    dominio: 'registro.cbandina.com', status: 'SUSPENDIDA', start: '2026-06-02',
-    form: [v1([], [], '2026-06-02')],
+      fields: [
+        est('tipo_persona', 'b1', 'tipo_persona', true, {
+          label: 'Tipo de inversionista',
+          options: [NATURAL, JURIDICA],
+          width: 'completo',
+        }),
+
+        { id: 'pn_documento', section: 'b2', label: 'Documento de identidad', tipo: 'documento', required: true, condition: whenNatural },
+        est('nombre', 'b2', 'nombre', true, { label: 'Nombres', condition: whenNatural }),
+        { id: 'fg_apellidos', section: 'b2', label: 'Apellidos', tipo: 'texto', required: true, condition: whenNatural },
+        est('fg_nacimiento', 'b2', 'fecha_nacimiento', false, { condition: whenNatural }),
+        est('fg_nacionalidad', 'b2', 'nacionalidad', false, { condition: whenNatural }),
+
+        { id: 'pj_rif', section: 'b3', label: 'RIF de la empresa', tipo: 'documento', required: true, condition: whenLegal },
+        est('razon_social', 'b3', 'nombre', true, { label: 'Razón social', condition: whenLegal }),
+        { id: 'actividad', section: 'b3', label: 'Actividad económica', tipo: 'texto', required: false, standard: 'actividad', condition: whenLegal },
+        { id: 'fg_rep_nombre', section: 'b3', label: 'Representante legal', tipo: 'texto', required: false, condition: whenLegal },
+        { id: 'fg_rep_documento', section: 'b3', label: 'Documento del representante', tipo: 'documento', required: false, condition: whenLegal },
+
+        est('correo', 'b4', 'correo', true, { width: 'medio' }),
+        est('telefono', 'b4', 'telefono', true, { width: 'medio' }),
+        est('domicilio', 'b4', 'domicilio', true, { width: 'completo' }),
+
+        { id: 'ingresos', section: 'b5', label: 'Monto del aporte', tipo: 'moneda', required: true, standard: 'monto_declarado' },
+        { id: 'fg_moneda', section: 'b5', label: 'Moneda', tipo: 'lista', required: true, options: ['Bolívar', 'Dólar estadounidense', 'Euro'] },
+        { id: 'fg_plazo', section: 'b5', label: 'Plazo', tipo: 'lista', required: true, options: ['12 meses', '24 meses', '36 meses', '60 meses'] },
+        { id: 'frecuencia', section: 'b5', label: 'Frecuencia del aporte', tipo: 'lista', required: true, standard: 'frecuencia', options: ['Aporte único', 'Mensual', 'Trimestral', 'Semestral', 'Anual'] },
+
+        { id: 'origen_fondos', section: 'b6', label: 'Origen de los fondos', tipo: 'lista', required: true, standard: 'origen_fondos', width: 'completo', options: ['Actividad comercial', 'Salario', 'Venta de bienes', 'Dividendos', 'Ahorros', 'Herencia o donación', 'Otro'] },
+        est('es_pep', 'b6', 'cliente_pep', true, { label: '¿Es persona expuesta políticamente?' }),
+
+        { id: 'fg_declaracion', section: 'b7', label: DECLARACION, tipo: 'parrafo', required: false, width: 'completo' },
+        { id: 'fg_acepta', section: 'b7', label: 'Acepto la declaración', tipo: 'si-no', required: true },
+
+        { id: 'fg_doc_identidad', section: 'b8', label: 'Cédula o RIF', tipo: 'archivo', required: true },
+        { id: 'fg_doc_origen', section: 'b8', label: 'Soporte del origen de los fondos', tipo: 'archivo', required: false },
+      ],
+    }],
   },
 ]
+
+/** Sin clientes y sin formulario publicado. El administrador inicial no cuenta. */
+export const companyIsEmpty = (e: Company, clientCount: number) =>
+  clientCount === 0 && e.form.every(v => v.fields.length === 0 && v.sections.length === 0)
 
 /** Lo que hace falta para dar de alta una empresa. Sin administrador no hay alta. */
 export type IntakeData = {
@@ -202,6 +186,9 @@ const slice = createSlice({
       const e = s.list.find(x => x.id === a.payload.id)
       if (e) e.status = a.payload.status
     },
+    deleteCompany(s, a: PayloadAction<string>) {
+      s.list = s.list.filter(x => x.id !== a.payload)
+    },
     editCompany(s, a: PayloadAction<{ id: string; name: string; rif: string; slug: string }>) {
       const e = s.list.find(x => x.id === a.payload.id)
       if (!e) return
@@ -233,6 +220,24 @@ const slice = createSlice({
   },
 })
 
-export const { createCompany, changeCompanyStatus, editCompany, publishForm, replaceFormFromApi } = slice.actions
+export const {
+  createCompany, changeCompanyStatus, deleteCompany: companyRemoved,
+  editCompany, publishForm, replaceFormFromApi,
+} = slice.actions
 export default slice.reducer
 export type { FormField, Section }
+
+type StoreSnap = {
+  companies: State
+  clients: { list: Array<{ companyId: string }> }
+}
+
+/** Solo despacha si no hay clientes ni formulario. El administrador inicial no cuenta. */
+export const deleteCompany = (id: string) =>
+  (dispatch: (action: ReturnType<typeof companyRemoved>) => void, getState: () => StoreSnap) => {
+    const s = getState()
+    const e = s.companies.list.find(x => x.id === id)
+    const clientes = s.clients.list.filter(c => c.companyId === id).length
+    if (!e || !companyIsEmpty(e, clientes)) return
+    dispatch(companyRemoved(id))
+  }

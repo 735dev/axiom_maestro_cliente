@@ -31,6 +31,7 @@ export const PERMISSIONS = {
   companiesCreate: 'empresas.crear',
   companiesEdit: 'empresas.editar',
   companiesSuspend: 'empresas.suspender',
+  companiesDelete: 'empresas.borrar',
   retentionManage: 'retencion.gestionar',
 
   usersView: 'usuarios.ver',
@@ -181,6 +182,12 @@ export const CATALOG: PermissionDefinition[] = [
     code: P.companiesSuspend, name: 'Suspender empresas', group: 'Plataforma', level: 'critico',
     scope: 'platform',
     description: 'Suspender o reactivar una empresa. No la borra. Solo Super Admin.',
+    implies: [P.companiesView],
+  },
+  {
+    code: P.companiesDelete, name: 'Borrar empresas vacías', group: 'Plataforma', level: 'critico',
+    scope: 'platform',
+    description: 'Dar de baja una empresa que no tiene clientes ni formulario. Si ya hay expedientes, no se borra. Solo Super Admin.',
     implies: [P.companiesView],
   },
   {

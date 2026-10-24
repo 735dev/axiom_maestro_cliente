@@ -136,10 +136,9 @@ export const LoginPage = () => {
                 instalación. Contraseña común: Maestro123* */}
             {[
               { name: 'Super Admin — Axiom Core Tech', email: 'superadmin@axiomcoretech.com', rol: 'Super Admin', company: 'Axiom Core Tech' },
-              { name: 'Administrador — Transvalor Orinoco, C.A.', email: 'admin@transvalor.demo', rol: 'Administrador', company: 'Transvalor Orinoco, C.A.' },
-              { name: 'Comercialización — Transvalor Orinoco, C.A.', email: 'comercial@transvalor.demo', rol: 'Comercialización', company: 'Transvalor Orinoco, C.A.' },
-              { name: 'Auditoría — Transvalor Orinoco, C.A.', email: 'auditoria@transvalor.demo', rol: 'Auditoría', company: 'Transvalor Orinoco, C.A.' },
-              { name: 'Administrador — Empresa Demo Dos, C.A.', email: 'admin@demodos.demo', rol: 'Administrador', company: 'Empresa Demo Dos, C.A.' },
+              { name: 'Administrador — Fondo Ganadero, C.A.', email: 'admin@fondoganadero.demo', rol: 'Administrador', company: 'Fondo Ganadero, C.A.' },
+              { name: 'Comercialización — Fondo Ganadero, C.A.', email: 'comercial@fondoganadero.demo', rol: 'Comercialización', company: 'Fondo Ganadero, C.A.' },
+              { name: 'Auditoría — Fondo Ganadero, C.A.', email: 'auditoria@fondoganadero.demo', rol: 'Auditoría', company: 'Fondo Ganadero, C.A.' },
             ].map(u => (
               <button key={u.email} onClick={() => { setEmail(u.email); setPassword('Maestro123*'); setError(null) }}>
                 {u.name}

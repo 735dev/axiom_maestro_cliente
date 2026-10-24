@@ -1,7 +1,7 @@
 import { createSelector, createSlice, type PayloadAction } from '@reduxjs/toolkit'
 import { PERMISSIONS, withImplied, dependOn, type PermissionCode } from '@/shared/auth/permissions'
 import type { RootState } from '@/shared/store'
-import { createCompany } from '@/features/platform/store/companiesSlice'
+import { createCompany, companyRemoved } from '@/features/platform/store/companiesSlice'
 
 export type UserStatus = 'ACTIVO' | 'INVITADO' | 'BLOQUEADO' | 'INACTIVO'
 
@@ -81,21 +81,11 @@ export const INITIAL_ROLES: Rol[] = [
 ]
 
 export const INITIAL_USERS: SystemUser[] = [
-  { companyId: 'transvalor', id: 'u1', name: 'Oriana Méndez', email: 'omendez@transvalor.com', rolId: 'comercializacion', status: 'ACTIVO', lastAccess: '2026-08-31 15:40', granted: [], revoked: [] },
-  { companyId: 'transvalor', id: 'u2', name: 'Evelina Rodríguez', email: 'erodriguez@transvalor.com', rolId: 'oficial', status: 'ACTIVO', lastAccess: '2026-08-31 16:35', granted: [], revoked: [] },
-  { companyId: 'transvalor', id: 'u3', name: 'Marcos Ledezma', email: 'mledezma@transvalor.com', rolId: 'analista', status: 'ACTIVO', lastAccess: '2026-08-31 14:02', granted: [P.reportsView], revoked: [] },
-  { companyId: 'transvalor', id: 'u4', name: 'Luis Bermúdez', email: 'lbermudez@transvalor.com', rolId: 'auditoria', status: 'ACTIVO', lastAccess: '2026-08-28 09:10', granted: [], revoked: [] },
-  { companyId: 'transvalor', id: 'u5', name: 'Yeniré Castillo', email: 'ycastillo@transvalor.com', rolId: 'comercializacion', status: 'ACTIVO', lastAccess: '2026-08-30 11:25', granted: [], revoked: [P.recordsEdit] },
-  { companyId: 'transvalor', id: 'u6', name: 'Rosa Marcano', email: 'rmarcano@transvalor.com', rolId: 'administrador', status: 'ACTIVO', lastAccess: '2026-08-29 08:00', granted: [], revoked: [] },
-  { companyId: 'transvalor', id: 'u7', name: 'Gabriel Ortega', email: 'gortega@transvalor.com', rolId: 'analista', status: 'INVITADO', granted: [], revoked: [] },
-  { companyId: 'transvalor', id: 'u8', name: 'Pedro Alvarado', email: 'palvarado@transvalor.com', rolId: 'comercializacion', status: 'BLOQUEADO', lastAccess: '2026-07-14 16:48', granted: [], revoked: [] },
-  // Toda empresa tiene su administrador desde el alta.
-  { companyId: 'demo-seguros', id: 'u9', name: 'Andreína Salas', email: 'asalas@segurosdelcentro.com', rolId: 'administrador', status: 'ACTIVO', lastAccess: '2026-08-28 10:12', granted: [], revoked: [] },
-  { companyId: 'demo-seguros', id: 'u10', name: 'Héctor Peña', email: 'hpena@segurosdelcentro.com', rolId: 'comercializacion', status: 'ACTIVO', lastAccess: '2026-08-27 09:40', granted: [], revoked: [] },
-  { companyId: 'demo-casa', id: 'u11', name: 'Ricardo Ovalles', email: 'rovalles@cbandina.com', rolId: 'administrador', status: 'INVITADO', granted: [], revoked: [] },
-  // Personal de Axiom: mismo padrón, sin empresa.
-  { companyId: null, id: 'sa1', name: 'Jerson Arias', email: 'jerson@axiomcoretech.com', rolId: 'superadmin', status: 'ACTIVO', lastAccess: '2026-09-01 08:20', granted: [], revoked: [] },
-  { companyId: null, id: 'sa2', name: 'Soporte Axiom', email: 'soporte@axiomcoretech.com', rolId: 'superadmin', status: 'ACTIVO', lastAccess: '2026-08-30 17:05', granted: [], revoked: [] },
+  { companyId: 'fondo-ganadero', id: 'u1', name: 'Administrador — Fondo Ganadero, C.A.', email: 'admin@fondoganadero.demo', rolId: 'administrador', status: 'ACTIVO', lastAccess: '2026-10-24 09:00', granted: [], revoked: [] },
+  { companyId: 'fondo-ganadero', id: 'u2', name: 'Comercialización — Fondo Ganadero, C.A.', email: 'comercial@fondoganadero.demo', rolId: 'comercializacion', status: 'ACTIVO', lastAccess: '2026-10-24 09:00', granted: [], revoked: [] },
+  { companyId: 'fondo-ganadero', id: 'u3', name: 'Auditoría — Fondo Ganadero, C.A.', email: 'auditoria@fondoganadero.demo', rolId: 'auditoria', status: 'ACTIVO', lastAccess: '2026-10-24 09:00', granted: [], revoked: [] },
+  { companyId: null, id: 'sa1', name: 'Jerson Arias', email: 'jerson@axiomcoretech.com', rolId: 'superadmin', status: 'ACTIVO', lastAccess: '2026-10-24 08:20', granted: [], revoked: [] },
+  { companyId: null, id: 'sa2', name: 'Soporte Axiom', email: 'soporte@axiomcoretech.com', rolId: 'superadmin', status: 'ACTIVO', lastAccess: '2026-10-24 08:20', granted: [], revoked: [] },
 ]
 
 type State = { users: SystemUser[]; roles: Rol[] }
@@ -215,6 +205,10 @@ const slice = createSlice({
         status: 'ACTIVO',
         granted: [], revoked: [],
       })
+    })
+    builder.addCase(companyRemoved, (s, a) => {
+      s.users = s.users.filter(u => u.companyId !== a.payload)
+      s.roles = s.roles.filter(r => r.companyId !== a.payload)
     })
   },
 })

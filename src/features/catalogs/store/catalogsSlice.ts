@@ -1,6 +1,6 @@
 import { createSlice, type PayloadAction } from '@reduxjs/toolkit'
 import { PLATFORM_CATALOGS } from '@/features/platform/form/types'
-import { createCompany } from '@/features/platform/store/companiesSlice'
+import { createCompany, companyRemoved } from '@/features/platform/store/companiesSlice'
 import type { RootState } from '@/shared/store'
 
 /**
@@ -23,11 +23,20 @@ const initials = () =>
 // store local quede con selects vacíos.
 const INITIAL_CATALOGS = initials()
 
+const fondoCatalogs = () => {
+  const values = initials()
+  values.tipo_persona = ['Persona natural', 'Persona jurídica']
+  values.origen_fondos = [
+    'Actividad comercial', 'Salario', 'Venta de bienes', 'Dividendos',
+    'Ahorros', 'Herencia o donación', 'Otro',
+  ]
+  values.frecuencia = ['Aporte único', 'Mensual', 'Trimestral', 'Semestral', 'Anual']
+  return values
+}
+
 const initialState: State = {
   byCompany: {
-    transvalor: initials(),
-    'demo-seguros': initials(),
-    'demo-casa': initials(),
+    'fondo-ganadero': fondoCatalogs(),
   },
 }
 
@@ -58,6 +67,9 @@ const slice = createSlice({
   extraReducers: builder => {
     builder.addCase(createCompany, (s, a) => {
       s.byCompany[a.payload.id] = initials()
+    })
+    builder.addCase(companyRemoved, (s, a) => {
+      delete s.byCompany[a.payload]
     })
   },
 })

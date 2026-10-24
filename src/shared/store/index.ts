@@ -79,8 +79,9 @@ const withAudit: typeof root = (status, action) => {
  *       aprueba ni inhabilita clientes; esas facultades son del Administrador
  *       del Maestro. Se renueva también la sesión para no conservar permisos
  *       efectivos calculados con el rol anterior.
+ * v22 — una sola empresa: Fondo Ganadero y su ficha de inversionista.
  */
-const STATE_VERSION = 21
+const STATE_VERSION = 22
 
 /**
  * Porciones cuya forma cambió. Se descartan; el resto se conserva.

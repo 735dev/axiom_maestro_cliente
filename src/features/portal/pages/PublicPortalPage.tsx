@@ -284,7 +284,7 @@ const Status: React.FC<{ client: Client }> = ({ client }) => {
     },
     'APROBADO': {
       pill: 'ok', title: 'Su registro fue aprobado',
-      body: <>Ya puede contratar los servicios de Transvalor. Su código de cliente es{' '}
+      body: <>Ya puede operar como inversionista del Fondo Ganadero. Su código es{' '}
         <b className="num">{client.code}</b>.</>,
     },
     'RECHAZADO': {

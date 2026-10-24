@@ -239,6 +239,15 @@ function hechoDe(tipo: string, p: any, before: Status, after: Status): Hecho | n
         entity: { tipo: 'empresa', id: p.id, name: p.name },
         companyId: p.id, severity: 'sensible',
       }
+    case 'companies/deleteCompany': {
+      const prev = before.companies.list.find((e: any) => e.id === p)
+      return {
+        sistema: 'Plataforma', action: 'Empresa borrada',
+        detalle: `${prev?.name} (${prev?.rif}) se eliminó porque no tenía clientes ni formulario.`,
+        entity: { tipo: 'empresa', id: p, name: prev?.name },
+        companyId: null, severity: 'sensible',
+      }
+    }
     case 'companies/cambiarEstadoEmpresa': {
       const prev = before.companies.list.find((e: any) => e.id === p.id)
       return {

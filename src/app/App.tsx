@@ -18,8 +18,8 @@ import { PlatformPage } from '@/features/platform/pages/PlatformPage'
  * ámbito de su cuenta, no según por dónde entró. Dos direcciones distintas no
  * protegían nada y duplicaban lo que hay que endurecer.
  *
- * /acceso no se enlaza desde el portal público: quien trabaja en Transvalor
- * sabe la dirección, y el cliente no tiene por qué ver una puerta que no es
+ * /acceso no se enlaza desde el portal público: el personal del fondo
+ * sabe la dirección, y el inversionista no tiene por qué ver una puerta que no es
  * suya.
  */
 export function App() {
