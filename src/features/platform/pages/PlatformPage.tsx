@@ -237,7 +237,9 @@ const Companies = () => {
           { th: 'Empresa' }, { th: 'RIF' }, { th: 'Portal' }, { th: 'Clientes' },
           { th: 'Usuarios' }, { th: 'Formulario' }, { th: 'Estado' }, { th: '', end: true },
         ]}
-        row={e => (
+        row={e => {
+          const vacia = companyIsEmpty(e, clients.filter(c => c.companyId === e.id).length)
+          return (
           <>
             <td>
               <b style={{ fontWeight: 500 }}>{e.name}</b>
@@ -257,13 +259,19 @@ const Companies = () => {
                 }))}>
                   {e.status === 'ACTIVA' ? 'Suspender' : 'Reactivar'}
                 </button>}
-                {can(PERMISSIONS.companiesDelete) && companyIsEmpty(e, clients.filter(c => c.companyId === e.id).length) && (
-                  <button className="btn sm" onClick={() => setRemoving(e)}>Borrar</button>
+                {can(PERMISSIONS.companiesDelete) && (
+                  <button
+                    className="btn sm"
+                    disabled={!vacia}
+                    title={vacia ? undefined : 'Solo se borra una empresa sin clientes y sin formulario.'}
+                    onClick={() => setRemoving(e)}
+                  >Borrar</button>
                 )}
               </div>
             </td>
           </>
-        )}
+          )
+        }}
       />
 
       {adding && <NewCompany onClose={() => setAdding(false)} />}
