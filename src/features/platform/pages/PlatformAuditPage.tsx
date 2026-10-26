@@ -132,7 +132,12 @@ export const PlatformAuditPage = () => {
           </label>
         </>
       }
-      columns={[{ th: 'Fecha y hora' }, { th: 'Empresa' }, { th: 'Quién' }, { th: 'Qué hizo' }]}
+      columns={[
+        { th: 'Fecha y hora', sort: e => e.fecha },
+        { th: 'Empresa', sort: e => name(e.companyId) },
+        { th: 'Quién', sort: e => e.actor.name },
+        { th: 'Qué hizo', sort: e => e.action },
+      ]}
       row={e => (
         <>
           <td className="num td-sub" style={{ whiteSpace: 'nowrap' }}>{fmt(e.fecha)}</td>

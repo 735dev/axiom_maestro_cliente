@@ -85,8 +85,13 @@ export const MasterClients: React.FC<{ onOpen: (c: Client) => void; onNew: () =>
           {can(PERMISSIONS.recordsCreate) && <button className="btn pri sm" onClick={onNew}>Nuevo cliente</button>}
         </div>}
         columns={[
-          { th: 'Código' }, { th: 'Razón social' }, { th: 'RIF' }, { th: 'Sector' },
-          { th: 'Estado' }, { th: 'Registrado por' }, { th: 'Acciones' },
+          { th: 'Código', sort: c => c.code },
+          { th: 'Razón social', sort: c => c.legalName },
+          { th: 'RIF', sort: c => c.rif },
+          { th: 'Sector', sort: c => c.sector },
+          { th: 'Estado', sort: c => c.status },
+          { th: 'Registrado por', sort: c => c.registeredBy },
+          { th: 'Acciones' },
         ]}
         row={c => (
           <>

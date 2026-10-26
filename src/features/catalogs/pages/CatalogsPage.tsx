@@ -176,7 +176,10 @@ export const MasterCatalogs = () => {
           ? <button className="btn pri sm" onClick={() => { setValue(''); setAgregando(true) }}>Agregar valor</button>
           : undefined}
         columns={[
-          { th: 'Valor', width: '55%' }, { th: 'Clientes que lo usan' }, { th: 'Estado' }, { th: '', end: true },
+          { th: 'Valor', width: '55%', sort: v => v },
+          { th: 'Clientes que lo usan', sort: v => uso[v] ?? 0 },
+          { th: 'Estado', sort: v => (uso[v] ?? 0) > 0 ? 'En uso' : 'Sin usar' },
+          { th: '', end: true },
         ]}
         row={v => (
           <>

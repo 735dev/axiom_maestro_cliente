@@ -33,6 +33,20 @@ export const apiErrorMessage = (error: unknown, fallback: string): string => {
   return fallback
 }
 
+export type ClientDocumentLink = {
+  campo: string
+  archivo: string
+  bytes: number
+  url: string
+}
+
+/** GET /api/v1/clientes/{id}/documentos — a short-lived address for each file. */
+export const listClientDocuments = (clientId: string, field?: string) =>
+  httpClient.get<{ data: ClientDocumentLink[] }>(
+    `/clientes/${encodeURIComponent(clientId)}/documentos`,
+    { params: field ? { campo: field } : undefined },
+  ).then(r => r.data.data)
+
 /** POST /api/v1/clientes/{id}/documentos — `archivo` is the file, `campo` is the field code. */
 export const uploadClientDocument = (clientId: string, field: string, archivo: File) => {
   const body = new FormData()

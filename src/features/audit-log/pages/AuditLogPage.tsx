@@ -182,8 +182,11 @@ export const AuditLogPage = () => {
           </>
         }
         columns={[
-          { th: 'Fecha y hora' }, { th: 'Quién' }, { th: 'Qué hizo' },
-          { th: 'Sobre qué' }, { th: '', end: true },
+          { th: 'Fecha y hora', sort: e => e.fecha },
+          { th: 'Quién', sort: e => e.actor.name },
+          { th: 'Qué hizo', sort: e => e.action },
+          { th: 'Sobre qué', sort: e => e.entity ? `${e.entity.tipo} ${e.entity.id}` : '' },
+          { th: '', end: true },
         ]}
         row={e => (
           <>

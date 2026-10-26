@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react'
 import { type Client, type Person } from '../types/client.types'
+import type { ApiFormField } from '@/shared/api/maestro'
 import { Card, Tabs, Field, Modal, Paginator } from '@/shared/ui'
+import { SortHeaders, useTableSort, type Column } from '@/shared/ui/tableSort'
 import { usePagination } from '@/shared/hooks/usePagination'
 import { StatusPill } from '../components/Pills'
 import { useAppDispatch, useAppSelector } from '@/shared/store/hooks'
@@ -10,8 +12,28 @@ import { useCan } from '@/shared/hooks/useCan'
 import { useCurrentCompany } from '@/shared/hooks/useCurrentCompany'
 import { PERMISSIONS } from '@/shared/auth/permissions'
 import { maestroApi } from '@/shared/api/maestro'
+import { apiErrorMessage, listClientDocuments } from '../api/documents'
 import { fromApi } from './ClientsPage'
 import { showNotice } from '@/shared/store/slices/uiSlice'
+
+const FILE_NAME = /\.(pdf|docx?|png|jpe?g)$/i
+
+/** Filename stored in portal answers. The bytes live in Blackbox; the ficha keeps the name. */
+const storedFileName = (value: unknown): string =>
+  typeof value === 'string' && FILE_NAME.test(value.trim()) ? value.trim() : ''
+
+const supportFieldsOf = (fields: ApiFormField[]): ApiFormField[] =>
+  fields.filter(field => field.tipo_campo === 'archivo').sort((a, b) => a.orden - b.orden)
+
+const PEOPLE_COLUMNS: Column<Person>[] = [
+  { th: 'Name', sort: p => p.name },
+  { th: 'Document', sort: p => p.document },
+  { th: 'Rol', sort: p => p.rol },
+  { th: 'Participación', sort: p => p.porcentaje ?? null },
+  { th: 'Nationality', sort: p => p.nationality },
+  { th: 'PEP', sort: p => p.pep ? 'Sí' : 'No' },
+  { th: '' },
+]
 
 export const MasterRecord: React.FC<{ code: string; onBack: () => void }> = ({ code, onBack }) => {
   const client = useAppSelector(s => s.clients.list.find(c => c.code === code))
@@ -63,6 +85,21 @@ export const MasterRecord: React.FC<{ code: string; onBack: () => void }> = ({ c
   const [decision, setDecision] = useState<'APROBADO' | 'RECHAZADO' | null>(null)
   const [apiClientId, setApiClientId] = useState<string | null>(null)
   const [revisado, setRevisado] = useState(false)
+  // null = the published form has not answered yet. [] = it has no file fields.
+  const [supportFields, setSupportFields] = useState<ApiFormField[] | null>(null)
+  const [opening, setOpening] = useState<string | null>(null)
+  const [preview, setPreview] = useState<{ label: string; url: string } | null>(null)
+
+  useEffect(() => {
+    let active = true
+    maestroApi.currentForm()
+      .then(form => {
+        if (!active) return
+        setSupportFields(supportFieldsOf(form.secciones.flatMap(section => section.campos)))
+      })
+      .catch(() => { if (active) setSupportFields([]) })
+    return () => { active = false }
+  }, [])
 
   // Recargar /panel/clientes/CLI-… no trae el expediente en el primer render.
   // Hasta que el servidor responde no se dice que no existe.
@@ -76,13 +113,15 @@ export const MasterRecord: React.FC<{ code: string; onBack: () => void }> = ({ c
     return () => { active = false }
   }, [client, code, dispatch])
 
+  const peopleSort = useTableSort(people, PEOPLE_COLUMNS)
+  const peoplePage = usePagination(peopleSort.sorted, 10, `${peopleSort.index ?? ''}:${peopleSort.dir}`)
+
   if (!client && !revisado) return null
   if (!client) return <div className="empty">Client no encontrado.</div>
   const canEdit = can(PERMISSIONS.recordsEdit)
   const canApprove = can(PERMISSIONS.recordsApprove)
   const canDisable = can(PERMISSIONS.recordsDeactivate)
   const seesVerdict = canApprove || can(PERMISSIONS.auditLogView)
-  const peoplePage = usePagination(people)
   const suma = people.filter(p => p.rol === 'Accionista').reduce((a, p) => a + (p.porcentaje || 0), 0)
 
   const v = (k: keyof Client) => (draft[k] as string) ?? (client[k] as string)
@@ -122,6 +161,38 @@ export const MasterRecord: React.FC<{ code: string; onBack: () => void }> = ({ c
       dispatch(changeRecordStatus({ code, status: decision, user: user!.name, rol: user!.rol, reason }))
       setDecision(null); setReason('')
     } catch { dispatch(showNotice({ tipo: 'error', text: 'No fue posible registrar la decisión en el servidor.' })) }
+  }
+
+  const answers = client.portalAnswers ?? {}
+  const listedCodes = new Set((supportFields ?? []).map(field => field.codigo))
+  const documents = [
+    ...(supportFields ?? []).map(field => ({
+      code: field.codigo,
+      label: field.etiqueta,
+      name: storedFileName(answers[field.codigo]),
+    })),
+    ...Object.entries(answers)
+      .filter(([code, value]) => supportFields !== null && !listedCodes.has(code) && storedFileName(value))
+      .map(([code, value]) => ({ code, label: code, name: storedFileName(value) })),
+  ]
+
+  const openDocument = async (doc: { code: string; label: string }) => {
+    if (!apiClientId) {
+      dispatch(showNotice({ tipo: 'error', text: 'Todavía no se puede abrir el archivo.' }))
+      return
+    }
+    setOpening(doc.code)
+    try {
+      const rows = await listClientDocuments(apiClientId, doc.code)
+      const link = rows.find(row => row.campo === doc.code) ?? rows[0]
+      if (!link?.url) throw new Error('sin archivo')
+      if (/\.(png|jpe?g)$/i.test(link.archivo)) setPreview({ label: doc.label, url: link.url })
+      else window.open(link.url, '_blank', 'noopener,noreferrer')
+    } catch (error) {
+      dispatch(showNotice({ tipo: 'error', text: apiErrorMessage(error, 'No fue posible abrir el documento.') }))
+    } finally {
+      setOpening(null)
+    }
   }
 
   const field = (label: string, k: keyof Client, options?: string[]) =>
@@ -212,7 +283,7 @@ export const MasterRecord: React.FC<{ code: string; onBack: () => void }> = ({ c
                 {canEdit && <button className="btn sm pri" onClick={() => setAdding(true)}>Agregar persona</button>}
               </div>
               <table>
-                <thead><tr><th>Name</th><th>Document</th><th>Rol</th><th>Participación</th><th>Nationality</th><th>PEP</th><th /></tr></thead>
+                <thead><SortHeaders columns={PEOPLE_COLUMNS} index={peopleSort.index} dir={peopleSort.dir} onSort={peopleSort.toggle} /></thead>
                 <tbody>
                   {peoplePage.visibleItems.map(p => (
                     <tr key={p.id}>
@@ -256,6 +327,26 @@ export const MasterRecord: React.FC<{ code: string; onBack: () => void }> = ({ c
                 {field('Monto que espera movilizar', 'declaredAmount')}
                 {field('Frecuencia', 'frequency', ['Semanal', 'Quincenal', 'Mensual', 'Trimestral'])}
               </div>
+              {documents.length > 0 && (
+                <>
+                  <div className="sec">Documentos</div>
+                  <div className="grid">
+                    {documents.map(doc => (
+                      <Field key={doc.code} label={doc.label}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, padding: '8px 0', borderBottom: '1px solid var(--border)' }}>
+                          <span style={{ fontSize: 13.5 }}>{doc.name || 'Sin archivo'}</span>
+                          {doc.name && (
+                            <button type="button" className="btn sm" disabled={opening === doc.code}
+                              onClick={() => void openDocument(doc)}>
+                              {opening === doc.code ? 'Abriendo…' : 'Ver'}
+                            </button>
+                          )}
+                        </div>
+                      </Field>
+                    ))}
+                  </div>
+                </>
+              )}
               <div className="sec">Trazabilidad del registro</div>
               <div className="grid">
                 <Field label="Registrado por" value={client.registeredBy} />
@@ -271,6 +362,14 @@ export const MasterRecord: React.FC<{ code: string; onBack: () => void }> = ({ c
           )}
         </div>
       </Card>
+
+      {preview && (
+        <Modal title={preview.label} wide onClose={() => setPreview(null)}
+          footer={<button className="btn" onClick={() => setPreview(null)}>Cerrar</button>}>
+          <img src={preview.url} alt={preview.label} referrerPolicy="no-referrer"
+            style={{ display: 'block', maxWidth: '100%', maxHeight: '70vh', margin: '0 auto' }} />
+        </Modal>
+      )}
 
       {confirm && (
         <Modal title="Guardar cambios" onClose={() => setConfirming(false)}

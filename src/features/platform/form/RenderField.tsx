@@ -307,6 +307,31 @@ export const packAnswers = (
     }
   }
   aplicarCalculados()
+  // The switch renders off until the user touches it. That «No» is the answer.
+  for (const field of fields) {
+    if (field.tipo !== 'si-no' || repeatableIds.has(field.section)) continue
+    if (!fieldVisible(field, next, fields) || !blankSwitch(next[field.id])) continue
+    next[field.id] = 'no'
+  }
+  for (const sectionId of repeatableIds) {
+    const rows = next[rowsKey(sectionId)]
+    if (!Array.isArray(rows)) continue
+    const ofSection = fields.filter(c => c.section === sectionId && c.tipo === 'si-no')
+    for (const row of rows) {
+      if (!row || typeof row !== 'object') continue
+      const record = row as Record<string, unknown>
+      const ctx = { ...next, ...record }
+      for (const field of ofSection) {
+        if (!fieldVisible(field, ctx, fields) || !blankSwitch(record[field.id])) continue
+        record[field.id] = 'no'
+      }
+    }
+    const first = rows[0]
+    if (!first || typeof first !== 'object') continue
+    for (const field of ofSection) {
+      if (field.id in (first as Record<string, unknown>)) next[field.id] = (first as Record<string, unknown>)[field.id]
+    }
+  }
 
   const inRow = new Set(fields.filter(c => repeatableIds.has(c.section)).map(c => c.id))
   const archivos: PendingFile[] = []
@@ -538,6 +563,12 @@ export const RepeatableBlock: React.FC<{
 /** Un valor vacío es undefined, null, cadena vacía o arreglo vacío (multiple). */
 const empty = (v: unknown) => v === undefined || v === null || v === '' || (Array.isArray(v) && v.length === 0)
 
+/** Un sí/no sin valor es el interruptor apagado. */
+const blankSwitch = (v: unknown) => empty(v) || v === false
+
+const switchValue = (raw: unknown, tipo?: string) =>
+  tipo === 'si-no' && blankSwitch(raw) ? 'no' : raw
+
 /**
  * Convierte a número para comparar. Sin esto, "mayor que" y "menor que"
  * comparan como texto y "9" > "10" sale verdadero (orden ASCII): cualquier
@@ -550,7 +581,7 @@ const numero = (v: unknown): number => {
 
 const cumple = (cond: { fieldId: string; operador: string; value?: string }, valores: Record<string, unknown>, fields: FormField[]) => {
   const disparador = fields.find(c => c.id === cond.fieldId)
-  const crudo = valores[cond.fieldId]
+  const crudo = switchValue(valores[cond.fieldId], disparador?.tipo)
   const esNumerico = disparador && NUMERIC_TYPES.includes(disparador.tipo)
   switch (cond.operador) {
     case 'vacio': return empty(crudo)

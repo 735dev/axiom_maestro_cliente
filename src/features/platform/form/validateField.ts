@@ -1,7 +1,8 @@
 /**
  * Validación de un campo del formulario publicado.
  * Devuelve el mensaje en español, o null si el valor se puede guardar.
- * Un campo opcional vacío no es un error. "No" en un sí/no tampoco.
+ * Un campo opcional vacío no es un error. Un sí/no sin tocar vale como «No»:
+ * el interruptor ya se muestra apagado y esa es la opción del cliente.
  */
 
 import type { FormField } from './types'
@@ -78,6 +79,11 @@ const validateDate = (value: string): string | null => {
 }
 
 export const validateField = (field: FormField, value: unknown, values: Record<string, unknown>): string | null => {
+  if (field.tipo === 'si-no') {
+    if (empty(value) || value === false) return null
+    const t = String(value).trim().toLowerCase()
+    return t === 'si' || t === 'sí' || t === 'no' || t === 'true' || t === 'false' ? null : 'Seleccione sí o no.'
+  }
   if (field.tipo === 'archivo') {
     if (value instanceof File) return null
     if (empty(value)) return field.required ? 'Este campo es obligatorio.' : null
@@ -87,11 +93,6 @@ export const validateField = (field: FormField, value: unknown, values: Record<s
 
   const text = String(value).trim()
   const key = field.standard ?? field.id
-
-  if (field.tipo === 'si-no') {
-    const t = text.toLowerCase()
-    return t === 'si' || t === 'no' || t === 'true' || t === 'false' ? null : 'Seleccione sí o no.'
-  }
   if (field.tipo === 'documento' || key === 'documento' || key === 'rif') {
     return validateIdentityDocument(text, typeForDocument(key, values))
   }

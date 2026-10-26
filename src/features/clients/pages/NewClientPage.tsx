@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { SERVICES, INCOME_RANGES, type Client, type Person } from '../types/client.types'
 import { Card, Field, Pill, Paginator } from '@/shared/ui'
+import { SortHeaders, useTableSort, type Column } from '@/shared/ui/tableSort'
 import { usePagination } from '@/shared/hooks/usePagination'
 import * as V from '../schemas/client.schema'
 import { useCurrentCompany } from '@/shared/hooks/useCurrentCompany'
@@ -415,7 +416,17 @@ const Shareholding: React.FC<{
   people: Person[]; setPeople: (p: Person[]) => void; suma: number; hayRepresentante: boolean
 }> = ({ people, setPeople, suma, hayRepresentante }) => {
   const [f, setF] = useState<Omit<Person, 'id'> & { porcentajeTxt: string }>({ ...New, porcentajeTxt: '' })
-  const peoplePage = usePagination(people)
+  const peopleColumns: Column<Person>[] = [
+    { th: 'Name', sort: p => p.name },
+    { th: 'Document', sort: p => p.document },
+    { th: 'Rol', sort: p => p.rol },
+    { th: '%', sort: p => p.porcentaje ?? null },
+    { th: 'Nationality', sort: p => p.nationality },
+    { th: 'PEP', sort: p => p.pep ? 'Sí' : 'No' },
+    { th: '' },
+  ]
+  const peopleSort = useTableSort(people, peopleColumns)
+  const peoplePage = usePagination(peopleSort.sorted, 10, `${peopleSort.index ?? ''}:${peopleSort.dir}`)
   const listo = f.name.trim().length > 3 && f.document.trim().length > 4
 
   const add = () => {
@@ -435,7 +446,7 @@ const Shareholding: React.FC<{
         {people.length > 0 ? (
           <>
             <table>
-              <thead><tr><th>Name</th><th>Document</th><th>Rol</th><th>%</th><th>Nationality</th><th>PEP</th><th /></tr></thead>
+              <thead><SortHeaders columns={peopleColumns} index={peopleSort.index} dir={peopleSort.dir} onSort={peopleSort.toggle} /></thead>
               <tbody>
                 {peoplePage.visibleItems.map(p => (
                   <tr key={p.id}>

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react'
-import { Card, Kpi, Pill } from '@/shared/ui'
+import { Card, DataTable, Kpi, Pill } from '@/shared/ui'
 import { useAppSelector } from '@/shared/store/hooks'
 import { selectCatalogsOfMyCompany } from '@/features/catalogs/store/catalogsSlice'
 import { selectClientsOfMyCompany } from '@/features/clients/store/clientsSlice'
@@ -134,24 +134,28 @@ export const CompanyDashboard: React.FC<{ onAbrir: (c: Client) => void }> = ({ o
           <div className="ancho">
           <Card title="Esperando decisión" sub="Ordenados por antigüedad. Lo de arriba lleva más tiempo parado." flush>
             {enCola.length ? (
-              <table>
-                <thead><tr><th>Código</th><th>Client</th><th>Estado</th><th style={{ textAlign: 'right' }}>Espera</th></tr></thead>
-                <tbody>
-                  {enCola.slice(0, 6).map(c => {
-                    const d = dias(c.registeredAt)
-                    return (
-                      <tr key={c.code} className="click" onClick={() => onAbrir(c)}>
-                        <td className="num"><b>{c.code}</b></td>
-                        <td>{c.legalName}</td>
-                        <td><StatusPill e={c.status} /></td>
-                        <td className="num" style={{ textAlign: 'right' }}>
-                          {d} d{d >= 15 && <> <Pill k="warn">Demorado</Pill></>}
-                        </td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
+              <DataTable
+                rows={enCola.slice(0, 6)}
+                rowKey={c => c.code}
+                onRow={onAbrir}
+                columns={[
+                  { th: 'Código', sort: c => c.code },
+                  { th: 'Client', sort: c => c.legalName },
+                  { th: 'Estado', sort: c => c.status },
+                  { th: 'Espera', end: true, sort: c => dias(c.registeredAt) },
+                ]}
+                row={c => {
+                  const d = dias(c.registeredAt)
+                  return <>
+                    <td className="num"><b>{c.code}</b></td>
+                    <td>{c.legalName}</td>
+                    <td><StatusPill e={c.status} /></td>
+                    <td className="num" style={{ textAlign: 'right' }}>
+                      {d} d{d >= 15 && <> <Pill k="warn">Demorado</Pill></>}
+                    </td>
+                  </>
+                }}
+              />
             ) : <div className="empty">Nada esperando decisión.</div>}
           </Card>
           </div>
@@ -184,91 +188,100 @@ export const CompanyDashboard: React.FC<{ onAbrir: (c: Client) => void }> = ({ o
 
         {viewUsers && (
           <Card title="Revisar en accesos" sub="Lo que conviene mirar cada tanto." flush>
-            <table>
-              <thead><tr><th>Qué</th><th style={{ textAlign: 'right' }}>Cuántos</th></tr></thead>
-              <tbody>
-                <tr>
-                  <td>
-                    Roles con permissions en tensión
-                    <div className="td-sub">
-                      {rolesInTension.length
-                        ? rolesInTension.map(r => r.name).join(', ')
-                        : 'Ninguno junta registrar y aprobar.'}
-                    </div>
-                  </td>
-                  <td className="num" style={{ textAlign: 'right' }}>
-                    {rolesInTension.length}
-                    {rolesInTension.length > 0 && <> <Pill k="warn">Revisar</Pill></>}
-                  </td>
-                </tr>
-                <tr>
-                  <td>
-                    Users con excepciones sobre su rol
-                    <div className="td-sub">
-                      {conExcepciones.length
-                        ? conExcepciones.map(u => u.name).join(', ')
-                        : 'Todos con los permisos de su rol, sin ajustes.'}
-                    </div>
-                  </td>
-                  <td className="num" style={{ textAlign: 'right' }}>{conExcepciones.length}</td>
-                </tr>
-                <tr>
-                  <td>
-                    Invitaciones sin usar
-                    <div className="td-sub">
-                      {invitados.length ? invitados.map(u => u.name).join(', ') : 'Nadie quedó a mitad de camino.'}
-                    </div>
-                  </td>
-                  <td className="num" style={{ textAlign: 'right' }}>{invitados.length}</td>
-                </tr>
-                <tr>
-                  <td>
-                    Roles sin nadie asignado
-                    <div className="td-sub">
-                      {rolesSinUso.length ? rolesSinUso.map(r => r.name).join(', ') : 'Todos los roles están en uso.'}
-                    </div>
-                  </td>
-                  <td className="num" style={{ textAlign: 'right' }}>{rolesSinUso.length}</td>
-                </tr>
-              </tbody>
-            </table>
+            <DataTable
+              rows={[
+                {
+                  id: 'tension',
+                  que: 'Roles con permissions en tensión',
+                  detalle: rolesInTension.length ? rolesInTension.map(r => r.name).join(', ') : 'Ninguno junta registrar y aprobar.',
+                  n: rolesInTension.length,
+                  aviso: rolesInTension.length > 0,
+                },
+                {
+                  id: 'excepciones',
+                  que: 'Users con excepciones sobre su rol',
+                  detalle: conExcepciones.length ? conExcepciones.map(u => u.name).join(', ') : 'Todos con los permisos de su rol, sin ajustes.',
+                  n: conExcepciones.length,
+                  aviso: false,
+                },
+                {
+                  id: 'invitados',
+                  que: 'Invitaciones sin usar',
+                  detalle: invitados.length ? invitados.map(u => u.name).join(', ') : 'Nadie quedó a mitad de camino.',
+                  n: invitados.length,
+                  aviso: false,
+                },
+                {
+                  id: 'sin-uso',
+                  que: 'Roles sin nadie asignado',
+                  detalle: rolesSinUso.length ? rolesSinUso.map(r => r.name).join(', ') : 'Todos los roles están en uso.',
+                  n: rolesSinUso.length,
+                  aviso: false,
+                },
+              ]}
+              rowKey={r => r.id}
+              columns={[
+                { th: 'Qué', sort: r => r.que },
+                { th: 'Cuántos', end: true, sort: r => r.n },
+              ]}
+              row={r => <>
+                <td>{r.que}<div className="td-sub">{r.detalle}</div></td>
+                <td className="num" style={{ textAlign: 'right' }}>
+                  {r.n}{r.aviso && <> <Pill k="warn">Revisar</Pill></>}
+                </td>
+              </>}
+            />
           </Card>
         )}
 
         {/* ---------- Configuración ---------- */}
         {viewCatalogs && (
           <Card title="Configuración de la empresa" sub="Qué se le pide al cliente y con qué listas." flush>
-            <table>
-              <tbody>
-                <tr>
-                  <td>Form de captación
-                    <div className="td-sub">Lo publica Axiom; la company lo consulta.</div></td>
-                  <td style={{ textAlign: 'right' }}>
-                    {current
-                      ? <><b className="num">v{current.version}</b>
-                        <div className="td-sub">start {current.start} · {current.fields.length} fields</div></>
-                      : <span className="td-sub">Sin publicar</span>}
-                  </td>
-                </tr>
-                <tr>
-                  <td>Sections del form
-                    <div className="td-sub">Cada una es un paso para el client.</div></td>
-                  <td className="num" style={{ textAlign: 'right' }}>{current?.sections.length ?? 0}</td>
-                </tr>
-                <tr>
-                  <td>Valores en catálogos
-                    <div className="td-sub">
-                      {Object.keys(catalogs).map(id => catalogOf(id)?.name ?? id).join(' · ')}
-                    </div></td>
-                  <td className="num" style={{ textAlign: 'right' }}>{catalogValueList}</td>
-                </tr>
-                <tr>
-                  <td>Portal del client
-                    <div className="td-sub">Por donde entran a autogestionarse.</div></td>
-                  <td className="td-sub" style={{ textAlign: 'right' }}>{company ? `/${company.slug}` : '—'}</td>
-                </tr>
-              </tbody>
-            </table>
+            <DataTable
+              rows={[
+                {
+                  id: 'form',
+                  que: 'Form de captación',
+                  detalle: 'Lo publica Axiom; la company lo consulta.',
+                  valor: current ? `v${current.version}` : 'Sin publicar',
+                  extra: current ? `start ${current.start} · ${current.fields.length} fields` : '',
+                },
+                {
+                  id: 'sections',
+                  que: 'Sections del form',
+                  detalle: 'Cada una es un paso para el client.',
+                  valor: String(current?.sections.length ?? 0),
+                  extra: '',
+                },
+                {
+                  id: 'catalogs',
+                  que: 'Valores en catálogos',
+                  detalle: Object.keys(catalogs).map(id => catalogOf(id)?.name ?? id).join(' · '),
+                  valor: String(catalogValueList),
+                  extra: '',
+                },
+                {
+                  id: 'portal',
+                  que: 'Portal del client',
+                  detalle: 'Por donde entran a autogestionarse.',
+                  valor: company ? `/${company.slug}` : '',
+                  extra: '',
+                },
+              ]}
+              rowKey={r => r.id}
+              columns={[
+                { th: 'Qué', sort: r => r.que },
+                { th: 'Valor', end: true, sort: r => r.valor },
+              ]}
+              row={r => <>
+                <td>{r.que}<div className="td-sub">{r.detalle}</div></td>
+                <td style={{ textAlign: 'right' }}>
+                  {r.id === 'form' && current
+                    ? <><b className="num">{r.valor}</b>{r.extra && <div className="td-sub">{r.extra}</div>}</>
+                    : <span className={r.id === 'portal' ? 'td-sub' : 'num'}>{r.valor || '—'}</span>}
+                </td>
+              </>}
+            />
           </Card>
         )}
 
@@ -276,24 +289,26 @@ export const CompanyDashboard: React.FC<{ onAbrir: (c: Client) => void }> = ({ o
         {viewAuditLog && (
           <Card title="Movimientos sensibles" sub="Permisos, estados y bajas. Lo que un auditor mira primero." flush>
             {sensitiveItems.length ? (
-              <table>
-                <thead><tr><th>Cuándo</th><th>Quién</th><th>Qué hizo</th></tr></thead>
-                <tbody>
-                  {sensitiveItems.slice(0, 6).map(e => (
-                    <tr key={e.id}>
-                      <td className="num td-sub" style={{ whiteSpace: 'nowrap' }}>{fmt(e.fecha)}</td>
-                      <td>
-                        <b style={{ fontWeight: 500, fontSize: 13 }}>{e.actor.name}</b>
-                        <div className="td-sub">{e.actor.rol}</div>
-                      </td>
-                      <td className="td-m">
-                        {e.action}
-                        <div className="td-sub">{e.detalle}</div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+              <DataTable
+                rows={sensitiveItems.slice(0, 6)}
+                rowKey={e => e.id}
+                columns={[
+                  { th: 'Cuándo', sort: e => e.fecha },
+                  { th: 'Quién', sort: e => e.actor.name },
+                  { th: 'Qué hizo', sort: e => e.action },
+                ]}
+                row={e => <>
+                  <td className="num td-sub" style={{ whiteSpace: 'nowrap' }}>{fmt(e.fecha)}</td>
+                  <td>
+                    <b style={{ fontWeight: 500, fontSize: 13 }}>{e.actor.name}</b>
+                    <div className="td-sub">{e.actor.rol}</div>
+                  </td>
+                  <td className="td-m">
+                    {e.action}
+                    <div className="td-sub">{e.detalle}</div>
+                  </td>
+                </>}
+              />
             ) : <div className="empty">Sin movimientos sensitiveItems todavía.</div>}
           </Card>
         )}

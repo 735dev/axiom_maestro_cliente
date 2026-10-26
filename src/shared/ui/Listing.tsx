@@ -2,6 +2,7 @@ import React from 'react'
 import { Card } from './index'
 import { Paginator } from './Paginator'
 import { usePagination } from '@/shared/hooks/usePagination'
+import { SortHeaders, useTableSort, type Column } from './tableSort'
 
 /**
  * Listado con barra de herramientas, tabla y paginación.
@@ -15,12 +16,7 @@ import { usePagination } from '@/shared/hooks/usePagination'
  * mecánica y no tiene por qué repetirse en cada pantalla.
  */
 
-export type Column = {
-  th: React.ReactNode
-  /** Alineación de la columna, para números y para la de acciones. */
-  end?: boolean
-  width?: string
-}
+export type { Column } from './tableSort'
 
 export type Filter = {
   value: string
@@ -41,7 +37,7 @@ export function Listing<T>({
   title: string
   sub?: string
   rows: T[]
-  columns: Column[]
+  columns: Column<T>[]
   row: (item: T) => React.ReactNode
   rowKey: (item: T) => string
   /** Nombre de lo que se lista, para el paginador: "clientes", "usuarios". */
@@ -61,7 +57,8 @@ export function Listing<T>({
   chips?: Chip[]
   onClear?: () => void
 }) {
-  const { visibleItems, paginator } = usePagination(rows, perPage)
+  const sort = useTableSort(rows, columns)
+  const { visibleItems, paginator } = usePagination(sort.sorted, perPage, `${sort.index ?? ''}:${sort.dir}`)
 
   const herramientas = (search || filters.length || actions) ? (
     <div className="lst-tools">
@@ -101,11 +98,7 @@ export function Listing<T>({
 
       <table>
         <thead>
-          <tr>
-            {columns.map((c, i) => (
-              <th key={i} style={{ textAlign: c.end ? 'right' : undefined, width: c.width }}>{c.th}</th>
-            ))}
-          </tr>
+          <SortHeaders columns={columns} index={sort.index} dir={sort.dir} onSort={sort.toggle} />
         </thead>
         <tbody>
           {visibleItems.map(item => (

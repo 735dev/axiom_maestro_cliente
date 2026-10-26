@@ -90,8 +90,13 @@ export const PlatformUsers = () => {
           },
         ]}
         columns={[
-          { th: 'Usuario' }, { th: 'Dónde' }, { th: 'Rol' },
-          { th: 'Permisos' }, { th: 'Estado' }, { th: 'Último acceso' }, { th: '', end: true },
+          { th: 'Usuario', sort: u => u.name },
+          { th: 'Dónde', sort: u => whereAt(u) },
+          { th: 'Rol', sort: u => rolDe(u.rolId) },
+          { th: 'Permisos' },
+          { th: 'Estado', sort: u => u.status },
+          { th: 'Último acceso', sort: u => u.lastAccess ?? '' },
+          { th: '', end: true },
         ]}
         row={u => (
           <>

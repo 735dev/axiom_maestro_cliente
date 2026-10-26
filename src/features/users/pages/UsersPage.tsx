@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { Card, Tabs, Field, Modal, Pill, Kpi, Paginator } from '@/shared/ui'
+import { SortHeaders, useTableSort, type Column } from '@/shared/ui/tableSort'
 import { usePagination } from '@/shared/hooks/usePagination'
 import {
   PERMISSIONS, TENANT_CATALOG, TENANT_GROUPS, definitionOf, dependOn, isPlatformPermission, withImplied,
@@ -78,7 +79,17 @@ const Users = () => {
 
   const list = users.filter(u =>
     (u.name + u.email + (rolDe(u.rolId)?.name ?? '')).toLowerCase().includes(q.trim().toLowerCase()))
-  const { visibleItems, paginator } = usePagination(list)
+  const columns: Column<SystemUser>[] = [
+    { th: 'Usuario', sort: u => u.name },
+    { th: 'Correo', sort: u => u.email },
+    { th: 'Rol', sort: u => rolDe(u.rolId)?.name ?? '' },
+    { th: 'Permisos', sort: u => effectivePermissions(u, roles).length },
+    { th: 'Estado', sort: u => u.status },
+    { th: 'Último acceso', sort: u => u.lastAccess ?? '' },
+    { th: '' },
+  ]
+  const sort = useTableSort(list, columns)
+  const { visibleItems, paginator } = usePagination(sort.sorted, 10, `${sort.index ?? ''}:${sort.dir}`)
 
   return (
     <>
@@ -99,7 +110,7 @@ const Users = () => {
       </div>
 
       <table>
-        <thead><tr><th>Usuario</th><th>Correo</th><th>Rol</th><th>Permisos</th><th>Estado</th><th>Último acceso</th><th /></tr></thead>
+        <thead><SortHeaders columns={columns} index={sort.index} dir={sort.dir} onSort={sort.toggle} /></thead>
         <tbody>
           {visibleItems.map(u => {
             const effective = effectivePermissions(u, roles)
@@ -478,7 +489,14 @@ const Catalog = () => {
   const list = TODOS.filter(p =>
     (p + (definitionOf(p)?.name ?? '') + (definitionOf(p)?.description ?? '') + (definitionOf(p)?.group ?? ''))
       .toLowerCase().includes(q.trim().toLowerCase()))
-  const { visibleItems, paginator } = usePagination(list)
+  const columns: Column<PermissionCode>[] = [
+    { th: 'Código', sort: p => p },
+    { th: 'Qué habilita', sort: p => definitionOf(p)?.name ?? '' },
+    { th: 'Grupo', sort: p => definitionOf(p)?.group ?? '' },
+    { th: 'Nivel', sort: p => definitionOf(p)?.level ?? '' },
+  ]
+  const sort = useTableSort(list, columns)
+  const { visibleItems, paginator } = usePagination(sort.sorted, 10, `${sort.index ?? ''}:${sort.dir}`)
 
   return (
     <>
@@ -488,7 +506,7 @@ const Catalog = () => {
           style={{ padding: '7px 12px', border: '1px solid var(--border)', borderRadius: 10, width: 220, background: 'var(--bg)' }} />
       </div>
       <table>
-        <thead><tr><th>Código</th><th>Qué habilita</th><th>Grupo</th><th>Nivel</th></tr></thead>
+        <thead><SortHeaders columns={columns} index={sort.index} dir={sort.dir} onSort={sort.toggle} /></thead>
         <tbody>
           {visibleItems.map(p => (
             <tr key={p}>

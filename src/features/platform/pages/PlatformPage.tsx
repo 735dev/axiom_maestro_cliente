@@ -147,7 +147,11 @@ const DraftRetention = () => {
     sub="Define cuánto tiempo puede permanecer un registro sin actividad antes de que la tarea programada lo inactive. Nunca se borra físicamente."
     rows={items} rowKey={x => x.empresa_id} label="empresas"
     empty={loading ? 'Cargando políticas…' : 'No hay empresas configuradas.'}
-    columns={[{ th: 'Empresa' }, { th: 'Días de retención' }, { th: 'Efecto' }]}
+    columns={[
+      { th: 'Empresa', sort: x => x.empresa },
+      { th: 'Días de retención', sort: x => x.dias },
+      { th: 'Efecto', sort: x => x.dias },
+    ]}
     row={x => <>
       <td><b>{x.empresa}</b><div className="td-sub">Política propia de esta company</div></td>
       <td>
@@ -234,8 +238,14 @@ const Companies = () => {
         }]}
         actions={can(PERMISSIONS.companiesCreate) ? <button className="btn pri sm" onClick={() => setAdding(true)}>Nueva empresa</button> : undefined}
         columns={[
-          { th: 'Empresa' }, { th: 'RIF' }, { th: 'Portal' }, { th: 'Clientes' },
-          { th: 'Usuarios' }, { th: 'Formulario' }, { th: 'Estado' }, { th: '', end: true },
+          { th: 'Empresa', sort: e => e.name },
+          { th: 'RIF', sort: e => e.rif },
+          { th: 'Portal', sort: e => e.slug },
+          { th: 'Clientes', sort: e => clients.filter(c => c.companyId === e.id).length },
+          { th: 'Usuarios', sort: e => users.filter(u => u.companyId === e.id).length },
+          { th: 'Formulario', sort: e => currentVersion(e).version },
+          { th: 'Estado', sort: e => e.status },
+          { th: '', end: true },
         ]}
         row={e => {
           const vacia = companyIsEmpty(e, clients.filter(c => c.companyId === e.id).length)

@@ -61,4 +61,6 @@ export const Modal: React.FC<{ title: string; onClose: () => void; footer?: Reac
 export { Paginator } from './Paginator'
 
 export { Listing } from './Listing'
-export type { Column, Filter, Chip } from './Listing'
+export type { Filter, Chip } from './Listing'
+export { DataTable } from './tableSort'
+export type { Column } from './tableSort'

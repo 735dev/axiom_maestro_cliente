@@ -1,5 +1,5 @@
 import React from 'react'
-import { Card, Kpi, Pill } from '@/shared/ui'
+import { Card, DataTable, Kpi, Pill } from '@/shared/ui'
 import { useAppSelector } from '@/shared/store/hooks'
 import { currentVersion } from '../store/companiesSlice'
 import { STANDARD_FIELDS, standardOf } from '../form/types'
@@ -47,19 +47,22 @@ export const PlatformDashboard = () => {
       {sinArrancar.length > 0 && (
         <Card title="Empresas que no arrancaron"
           sub="Tienen cuenta pero su formulario está vacío: hoy no pueden recibir ni un cliente." flush>
-          <table>
-            <thead><tr><th>Company</th><th>Intake</th><th>Portal</th><th>Estado</th></tr></thead>
-            <tbody>
-              {sinArrancar.map(e => (
-                <tr key={e.id}>
-                  <td><b style={{ fontWeight: 500 }}>{e.name}</b></td>
-                  <td className="num">{e.start}</td>
-                  <td style={{ color: 'var(--muted)', fontSize: 12.5 }}>/{e.slug}</td>
-                  <td>{e.status === 'ACTIVA' ? <Pill k="warn">Activa sin uso</Pill> : <Pill k="bad">Suspendida</Pill>}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <DataTable
+            rows={sinArrancar}
+            rowKey={e => e.id}
+            columns={[
+              { th: 'Company', sort: e => e.name },
+              { th: 'Intake', sort: e => e.start },
+              { th: 'Portal', sort: e => e.slug },
+              { th: 'Estado', sort: e => e.status },
+            ]}
+            row={e => <>
+              <td><b style={{ fontWeight: 500 }}>{e.name}</b></td>
+              <td className="num">{e.start}</td>
+              <td style={{ color: 'var(--muted)', fontSize: 12.5 }}>/{e.slug}</td>
+              <td>{e.status === 'ACTIVA' ? <Pill k="warn">Activa sin uso</Pill> : <Pill k="bad">Suspendida</Pill>}</td>
+            </>}
+          />
         </Card>
       )}
 
@@ -76,39 +79,44 @@ export const PlatformDashboard = () => {
         <Card title="Campos propios en uso"
           sub="Lo que las empresas tuvieron que inventar. Si se repite, es candidato al catálogo." flush>
           {customByCompany.length ? (
-            <table>
-              <thead><tr><th>Field</th><th>Company</th></tr></thead>
-              <tbody>
-                {customByCompany.map((p, i) => (
-                  <tr key={i}>
-                    <td>{p.field}<div style={{ color: 'var(--muted)', fontSize: 11.5 }}>sin índice</div></td>
-                    <td style={{ fontSize: 12.5 }}>{p.company}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            <DataTable
+              rows={customByCompany}
+              rowKey={p => `${p.company}:${p.field}`}
+              columns={[
+                { th: 'Field', sort: p => p.field },
+                { th: 'Company', sort: p => p.company },
+              ]}
+              row={p => <>
+                <td>{p.field}<div style={{ color: 'var(--muted)', fontSize: 11.5 }}>sin índice</div></td>
+                <td style={{ fontSize: 12.5 }}>{p.company}</td>
+              </>}
+            />
           ) : <div className="empty">Ninguna company necesitó fields fuera del catálogo.</div>}
         </Card>
 
         <Card title="Formularios" sub="En qué versión va cada empresa y qué tan armado está." flush>
-          <table>
-            <thead><tr><th>Company</th><th>Versión</th><th>Sections</th><th>Fields</th><th>Estándar</th></tr></thead>
-            <tbody>
-              {companies.map(e => {
-                const v = currentVersion(e)
-                const est = v.fields.filter(c => standardOf(c.standard)).length
-                return (
-                  <tr key={e.id}>
-                    <td><b style={{ fontWeight: 500 }}>{e.name}</b></td>
-                    <td className="num">v{v.version}</td>
-                    <td className="num">{v.sections.length}</td>
-                    <td className="num">{v.fields.length}</td>
-                    <td className="num">{est} de {v.fields.length}</td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
+          <DataTable
+            rows={companies}
+            rowKey={e => e.id}
+            columns={[
+              { th: 'Company', sort: e => e.name },
+              { th: 'Versión', sort: e => currentVersion(e).version },
+              { th: 'Sections', sort: e => currentVersion(e).sections.length },
+              { th: 'Fields', sort: e => currentVersion(e).fields.length },
+              { th: 'Estándar', sort: e => currentVersion(e).fields.filter(c => standardOf(c.standard)).length },
+            ]}
+            row={e => {
+              const v = currentVersion(e)
+              const est = v.fields.filter(c => standardOf(c.standard)).length
+              return <>
+                <td><b style={{ fontWeight: 500 }}>{e.name}</b></td>
+                <td className="num">v{v.version}</td>
+                <td className="num">{v.sections.length}</td>
+                <td className="num">{v.fields.length}</td>
+                <td className="num">{est} de {v.fields.length}</td>
+              </>
+            }}
+          />
         </Card>
       </div>
     </>
