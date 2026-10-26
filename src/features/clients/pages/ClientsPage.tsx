@@ -38,18 +38,7 @@ export const MasterClients: React.FC<{ onOpen: (c: Client) => void; onNew: () =>
   }, [dispatch])
 
   useEffect(() => {
-    let active = true
-    sincronizar(true)
-    // El portal público puede enviar un cliente mientras esta pantalla está
-    // abierta. Refrescamos solo lectura, sin reemplazar acciones del usuario.
-    const intervalo = window.setInterval(() => { if (active) sincronizar() }, 5000)
-    const alVolver = () => { if (active) sincronizar() }
-    window.addEventListener('focus', alVolver)
-    return () => {
-      active = false
-      window.clearInterval(intervalo)
-      window.removeEventListener('focus', alVolver)
-    }
+    void sincronizar(true)
   }, [sincronizar])
 
   const list = useMemo(() => clients.filter(c =>
